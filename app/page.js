@@ -43,13 +43,13 @@ const ITEM_TYPES = {
   },
   dinners: {
     fields: ['name', 'time'],
-    detailFields: ['bookingVendor', 'confirmationNumber', 'notes'],
+    detailFields: ['address', 'bookingVendor', 'confirmationNumber', 'notes'],
     timeField: 'time',
     label: 'Dinner'
   },
   excursions: {
     fields: ['name', 'time'],
-    detailFields: ['bookingVendor', 'confirmationNumber', 'notes'],
+    detailFields: ['address', 'bookingVendor', 'confirmationNumber', 'notes'],
     timeField: 'time',
     label: 'Excursion'
   }
