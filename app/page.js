@@ -13,6 +13,53 @@ const Polyline = dynamic(() => import('react-leaflet').then(mod => mod.Polyline)
 
 const LOCAL_CACHE_KEY = 'vp:trip';
 
+// Schema for itinerary items, used by the chronological list, the add/edit
+// modal, and the idea-promotion modal.
+const ITEM_TYPES = {
+  flights: {
+    fields: ['airline', 'flightNumber', 'origin', 'destination', 'departure', 'arrival'],
+    detailFields: ['arrivalDate', 'bookingVendor', 'confirmationNumber', 'notes'],
+    timeField: 'departure',
+    label: 'Flight'
+  },
+  ferries: {
+    fields: ['company', 'vessel', 'origin', 'destination', 'departure', 'arrival'],
+    detailFields: ['departureAddress', 'arrivalAddress', 'passengers', 'bookingVendor', 'confirmationNumber', 'notes'],
+    timeField: 'departure',
+    label: 'Ferry'
+  },
+  carRentals: {
+    fields: ['company', 'pickup', 'dropoff'],
+    detailFields: ['pickupAddress', 'dropoffAddress', 'bookingVendor', 'confirmationNumber', 'notes'],
+    timeField: 'pickup',
+    label: 'Car Rental'
+  },
+  accommodations: {
+    fields: ['name', 'checkIn', 'checkOut', 'nights'],
+    detailFields: ['address', 'phone', 'bookingVendor', 'confirmationNumber', 'notes'],
+    timeField: 'checkIn',
+    label: 'Accommodation'
+  },
+  dinners: {
+    fields: ['name', 'time'],
+    detailFields: ['bookingVendor', 'confirmationNumber', 'notes'],
+    timeField: 'time',
+    label: 'Dinner'
+  },
+  excursions: {
+    fields: ['name', 'time'],
+    detailFields: ['bookingVendor', 'confirmationNumber', 'notes'],
+    timeField: 'time',
+    label: 'Excursion'
+  }
+};
+
+// Fields that should render as <input type="time"> for strict HH:MM entry.
+const TIME_FIELDS = new Set(['departure', 'arrival', 'pickup', 'dropoff', 'checkIn', 'checkOut', 'time']);
+
+// Categories that show "Save to Ideas" on their items.
+const IDEA_RETURNABLE = new Set(['excursions', 'dinners']);
+
 // City coordinates and aliases
 const cityCoords = {
   'Athens': [37.9838, 23.7275],
@@ -102,13 +149,30 @@ const DetailsSection = ({ title, items, fields, onAdd, onRemove }) => {
 };
 
 // IdeasCard component — global list of unscheduled activity ideas
-const IdeasCard = ({ ideas, onAdd, onRemove }) => {
+const IdeasCard = ({ ideas, onAdd, onUpdate, onRemove }) => {
   const [draft, setDraft] = useState({ name: '', location: '', notes: '' });
+  const [editingId, setEditingId] = useState(null);
 
   const submit = () => {
     if (!draft.name.trim() || !draft.location.trim()) return;
-    onAdd({ name: draft.name.trim(), location: draft.location.trim(), notes: draft.notes.trim() });
+    const payload = { name: draft.name.trim(), location: draft.location.trim(), notes: draft.notes.trim() };
+    if (editingId != null) {
+      onUpdate(editingId, payload);
+    } else {
+      onAdd(payload);
+    }
     setDraft({ name: '', location: '', notes: '' });
+    setEditingId(null);
+  };
+
+  const startEdit = (idea) => {
+    setDraft({ name: idea.name || '', location: idea.location || '', notes: idea.notes || '' });
+    setEditingId(idea.id);
+  };
+
+  const cancelEdit = () => {
+    setDraft({ name: '', location: '', notes: '' });
+    setEditingId(null);
   };
 
   return (
@@ -135,7 +199,12 @@ const IdeasCard = ({ ideas, onAdd, onRemove }) => {
           placeholder="Notes (optional)"
           style={{ flex: '2 1 200px' }}
         />
-        <button onClick={submit} className="add-btn"><Plus size={16} /></button>
+        <button onClick={submit} className="add-btn" title={editingId != null ? 'Save changes' : 'Add idea'}>
+          {editingId != null ? '✓' : <Plus size={16} />}
+        </button>
+        {editingId != null && (
+          <button onClick={cancelEdit} className="cancel-btn">Cancel</button>
+        )}
       </div>
       {ideas.length === 0 ? (
         <p style={{ opacity: 0.6, fontStyle: 'italic' }}>No ideas yet — add things you might want to do.</p>
@@ -147,6 +216,7 @@ const IdeasCard = ({ ideas, onAdd, onRemove }) => {
                 <div><strong>{idea.name}</strong> <span style={{ opacity: 0.7 }}>· {idea.location}</span></div>
                 {idea.notes && <div style={{ fontSize: '0.85em', opacity: 0.75 }}>{idea.notes}</div>}
               </div>
+              <button onClick={() => startEdit(idea)} className="details-btn" style={{ padding: '2px 6px', fontSize: '0.78em' }} title="Edit">✎</button>
               <button onClick={() => onRemove(idea.id)} className="remove-btn"><Trash2 size={12} /></button>
             </li>
           ))}
@@ -157,12 +227,13 @@ const IdeasCard = ({ ideas, onAdd, onRemove }) => {
 };
 
 // ChronologicalItinerary component
-const ChronologicalItinerary = ({ day, contextualAccommodations = [], onAddItem, onRemoveItem }) => {
+const ChronologicalItinerary = ({ day, contextualAccommodations = [], onAddItem, onRemoveItem, onUpdateItem, onSendToIdeas }) => {
   const [newItemType, setNewItemType] = useState('flights');
   const [newItem, setNewItem] = useState({});
   const [expandedItems, setExpandedItems] = useState(new Set());
   const [showAddModal, setShowAddModal] = useState(false);
   const [lookup, setLookup] = useState({ loading: false, error: null });
+  const [editing, setEditing] = useState(null); // { category, index } or null
 
   const handleFlightLookup = async () => {
     const number = (newItem.flightNumber || '').trim();
@@ -193,44 +264,7 @@ const ChronologicalItinerary = ({ day, contextualAccommodations = [], onAddItem,
     }
   };
 
-  const itemTypes = {
-    flights: {
-      fields: ['airline', 'flightNumber', 'origin', 'destination', 'departure', 'arrival'],
-      detailFields: ['arrivalDate', 'bookingVendor', 'confirmationNumber'],
-      timeField: 'departure',
-      label: 'Flight'
-    },
-    ferries: {
-      fields: ['company', 'vessel', 'origin', 'destination', 'departure', 'arrival'],
-      detailFields: ['departureAddress', 'arrivalAddress', 'passengers', 'bookingVendor', 'confirmationNumber'],
-      timeField: 'departure',
-      label: 'Ferry'
-    },
-    carRentals: {
-      fields: ['company', 'pickup', 'dropoff'],
-      detailFields: ['pickupAddress', 'dropoffAddress', 'bookingVendor', 'confirmationNumber'],
-      timeField: 'pickup',
-      label: 'Car Rental'
-    },
-    accommodations: {
-      fields: ['name', 'checkIn', 'checkOut', 'nights'],
-      detailFields: ['address', 'phone', 'bookingVendor', 'confirmationNumber'],
-      timeField: 'checkIn',
-      label: 'Accommodation'
-    },
-    dinners: {
-      fields: ['name', 'time'],
-      detailFields: ['bookingVendor', 'confirmationNumber'],
-      timeField: 'time',
-      label: 'Dinner'
-    },
-    excursions: {
-      fields: ['name', 'time', 'notes'],
-      detailFields: ['bookingVendor', 'confirmationNumber'],
-      timeField: 'time',
-      label: 'Excursion'
-    }
-  };
+  const itemTypes = ITEM_TYPES;
 
   // Combine all items with metadata. Skip accommodations here — they're rendered
   // contextually based on which night of the stay this day falls on.
@@ -291,14 +325,36 @@ const ChronologicalItinerary = ({ day, contextualAccommodations = [], onAddItem,
     setNewItem(allFields.reduce((acc, field) => ({ ...acc, [field]: '' }), {}));
   };
 
-  const handleAdd = () => {
+  const handleSubmit = () => {
     const hasContent = Object.values(newItem).some(v => typeof v === 'string' && v.trim());
-    if (hasContent) {
+    if (!hasContent) return;
+    if (editing) {
+      onUpdateItem(day.id, editing.category, editing.index, newItem);
+    } else {
       onAddItem(day.id, newItemType, newItem);
-      setNewItem({});
-      setLookup({ loading: false, error: null });
-      setShowAddModal(false);
     }
+    setNewItem({});
+    setLookup({ loading: false, error: null });
+    setEditing(null);
+    setShowAddModal(false);
+  };
+
+  const startEdit = (category, index) => {
+    const source = category === 'accommodations'
+      ? day.accommodations?.[index]
+      : day[category]?.[index];
+    if (!source) return;
+    setNewItemType(category);
+    setNewItem({ ...source });
+    setEditing({ category, index });
+    setShowAddModal(true);
+  };
+
+  const cancelModal = () => {
+    setNewItem({});
+    setEditing(null);
+    setLookup({ loading: false, error: null });
+    setShowAddModal(false);
   };
 
   const toggleItemDetails = (itemKey) => {
@@ -322,16 +378,16 @@ const ChronologicalItinerary = ({ day, contextualAccommodations = [], onAddItem,
       </div>
 
       {showAddModal && (
-        <div className="modal-overlay" onClick={() => setShowAddModal(false)}>
+        <div className="modal-overlay" onClick={cancelModal}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h3>Add Itinerary Item</h3>
-              <button onClick={() => setShowAddModal(false)} className="close-btn">×</button>
+              <h3>{editing ? 'Edit Item' : 'Add Itinerary Item'}</h3>
+              <button onClick={cancelModal} className="close-btn">×</button>
             </div>
             <div className="modal-body">
               <div className="form-group">
                 <label>Item Type</label>
-                <select value={newItemType} onChange={(e) => handleTypeChange(e.target.value)}>
+                <select value={newItemType} onChange={(e) => handleTypeChange(e.target.value)} disabled={!!editing}>
                   {Object.entries(itemTypes).map(([key, config]) => (
                     <option key={key} value={key}>{config.label}</option>
                   ))}
@@ -339,6 +395,7 @@ const ChronologicalItinerary = ({ day, contextualAccommodations = [], onAddItem,
               </div>
               {itemTypes[newItemType].fields.map(field => {
                 const isFlightNumber = newItemType === 'flights' && field === 'flightNumber';
+                const isTimeField = TIME_FIELDS.has(field);
                 return (
                   <div key={field} className="form-group">
                     <label>{field.charAt(0).toUpperCase() + field.slice(1)}</label>
@@ -361,9 +418,10 @@ const ChronologicalItinerary = ({ day, contextualAccommodations = [], onAddItem,
                       </div>
                     ) : (
                       <input
+                        type={isTimeField ? 'time' : 'text'}
                         value={newItem[field] || ''}
                         onChange={(e) => setNewItem({ ...newItem, [field]: e.target.value })}
-                        placeholder={`Enter ${field}`}
+                        placeholder={isTimeField ? '' : `Enter ${field}`}
                       />
                     )}
                     {isFlightNumber && lookup.error && (
@@ -376,22 +434,33 @@ const ChronologicalItinerary = ({ day, contextualAccommodations = [], onAddItem,
               })}
               {(itemTypes[newItemType].detailFields || []).map(field => {
                 const isDateField = /Date$/.test(field);
+                const isNotes = field === 'notes';
                 return (
                   <div key={field} className="form-group">
                     <label>{field.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}</label>
-                    <input
-                      type={isDateField ? 'date' : 'text'}
-                      value={newItem[field] || ''}
-                      onChange={(e) => setNewItem({ ...newItem, [field]: e.target.value })}
-                      placeholder={isDateField ? '' : `Enter ${field.replace(/([A-Z])/g, ' $1').toLowerCase()}`}
-                    />
+                    {isNotes ? (
+                      <textarea
+                        rows={3}
+                        value={newItem[field] || ''}
+                        onChange={(e) => setNewItem({ ...newItem, [field]: e.target.value })}
+                        placeholder="Notes…"
+                        style={{ width: '100%', resize: 'vertical', fontFamily: 'inherit' }}
+                      />
+                    ) : (
+                      <input
+                        type={isDateField ? 'date' : 'text'}
+                        value={newItem[field] || ''}
+                        onChange={(e) => setNewItem({ ...newItem, [field]: e.target.value })}
+                        placeholder={isDateField ? '' : `Enter ${field.replace(/([A-Z])/g, ' $1').toLowerCase()}`}
+                      />
+                    )}
                   </div>
                 );
               })}
             </div>
             <div className="modal-footer">
-              <button onClick={() => setShowAddModal(false)} className="cancel-btn">Cancel</button>
-              <button onClick={handleAdd} className="add-btn">Add Item</button>
+              <button onClick={cancelModal} className="cancel-btn">Cancel</button>
+              <button onClick={handleSubmit} className="add-btn">{editing ? 'Save' : 'Add Item'}</button>
             </div>
           </div>
         </div>
@@ -450,16 +519,36 @@ const ChronologicalItinerary = ({ day, contextualAccommodations = [], onAddItem,
                   </div>
                 )}
               </div>
-              {canRemove ? (
-                <button
-                  onClick={() => onRemoveItem(item.role === 'checkIn' ? item.hostDayId : day.id, item.category, item.index)}
-                  className="remove-btn"
-                >
-                  <Trash2 size={12} />
-                </button>
-              ) : (
-                <span style={{ width: '24px' }} />
+              {canRemove && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <button
+                    onClick={() => startEdit(item.category, item.index)}
+                    className="details-btn"
+                    title="Edit"
+                    style={{ padding: '2px 6px', fontSize: '0.78em' }}
+                  >
+                    ✎
+                  </button>
+                  {IDEA_RETURNABLE.has(item.category) && (
+                    <button
+                      onClick={() => onSendToIdeas(day.id, item.category, item.index)}
+                      className="details-btn"
+                      title="Move back to Ideas list"
+                      style={{ padding: '2px 6px', fontSize: '0.78em' }}
+                    >
+                      💡
+                    </button>
+                  )}
+                  <button
+                    onClick={() => onRemoveItem(item.role === 'checkIn' ? item.hostDayId : day.id, item.category, item.index)}
+                    className="remove-btn"
+                    title="Remove"
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                </div>
               )}
+              {!canRemove && <span style={{ width: '24px' }} />}
             </li>
           );
         })}
@@ -722,11 +811,36 @@ export default function HomePage() {
   };
 
   const removeItemFromDay = (dayId, category, index) => {
-    setDays(days.map(day =>
+    setDays(prev => prev.map(day =>
       day.id === dayId
         ? { ...day, [category]: day[category].filter((_, i) => i !== index) }
         : day
     ));
+  };
+
+  const updateItemInDay = (dayId, category, index, item) => {
+    setDays(prev => prev.map(day =>
+      day.id === dayId
+        ? { ...day, [category]: day[category].map((x, i) => i === index ? item : x) }
+        : day
+    ));
+  };
+
+  const sendItemToIdeas = (dayId, category, index) => {
+    const day = days.find(d => d.id === dayId);
+    if (!day) return;
+    const item = day[category]?.[index];
+    if (!item) return;
+    const nextId = ideas.length > 0 ? Math.max(...ideas.map(i => i.id)) + 1 : 1;
+    const ideaLocation = day.endLocation || day.startLocation || '';
+    setIdeas([...ideas, {
+      id: nextId,
+      name: item.name || '(unnamed)',
+      location: ideaLocation,
+      notes: item.notes || '',
+      coord: item.coord || null
+    }]);
+    removeItemFromDay(dayId, category, index);
   };
 
   const selectDay = (dayId) => {
@@ -739,19 +853,62 @@ export default function HomePage() {
     setIdeas([...ideas, { ...idea, id: nextId }]);
   };
 
+  const updateIdea = (id, updates) => {
+    setIdeas(ideas.map(i => i.id === id ? { ...i, ...updates } : i));
+  };
+
   const removeIdea = (id) => {
     setIdeas(ideas.filter(i => i.id !== id));
   };
 
-  const promoteIdeaToDay = (ideaId, dayId) => {
-    const idea = ideas.find(i => i.id === ideaId);
-    if (!idea) return;
-    setDays(prevDays => prevDays.map(d =>
-      d.id === dayId
-        ? { ...d, excursions: [...d.excursions, { name: idea.name, time: '', notes: idea.notes || '' }] }
+  // Idea-promotion modal state. (Wrapper kept here for clarity below.) When set, the modal opens with category +
+  // form pre-populated from the idea. Save adds to the day, removes from ideas.
+  const [promoting, setPromoting] = useState(null); // { idea, dayId } | null
+  const [promoteCategory, setPromoteCategory] = useState('excursions');
+  const [promoteForm, setPromoteForm] = useState({});
+
+  const startPromoteIdea = (idea, dayId) => {
+    setPromoting({ idea, dayId });
+    setPromoteCategory('excursions');
+    setPromoteForm({
+      name: idea.name || '',
+      notes: idea.notes || '',
+      coord: idea.coord || null
+    });
+  };
+
+  const cancelPromote = () => {
+    setPromoting(null);
+    setPromoteForm({});
+  };
+
+  const onPromoteCategoryChange = (cat) => {
+    setPromoteCategory(cat);
+    const config = ITEM_TYPES[cat];
+    const allFields = [...config.fields, ...(config.detailFields || [])];
+    // Preserve name/notes/coord across category changes; clear other fields.
+    setPromoteForm(prev => {
+      const base = allFields.reduce((acc, f) => ({ ...acc, [f]: '' }), {});
+      return {
+        ...base,
+        name: prev.name || '',
+        notes: prev.notes || '',
+        coord: prev.coord || null
+      };
+    });
+  };
+
+  const submitPromote = () => {
+    if (!promoting) return;
+    const hasContent = Object.values(promoteForm).some(v => typeof v === 'string' && v.trim());
+    if (!hasContent) return;
+    setDays(prev => prev.map(d =>
+      d.id === promoting.dayId
+        ? { ...d, [promoteCategory]: [...(d[promoteCategory] || []), promoteForm] }
         : d
     ));
-    setIdeas(prevIdeas => prevIdeas.filter(i => i.id !== ideaId));
+    setIdeas(prev => prev.filter(i => i.id !== promoting.idea.id));
+    cancelPromote();
   };
 
   const ideasForDay = (day) => {
@@ -823,19 +980,22 @@ export default function HomePage() {
   // Airport markers from looked-up flight data (coords stored on the flight item)
   const airportMarkers = [];
   const seenAirports = new Set();
+  const addAirportMarker = (name, coord) => {
+    if (!coord || !Array.isArray(coord) || coord.length !== 2) return;
+    const id = `${coord[0]},${coord[1]}`;
+    if (seenAirports.has(id)) return;
+    seenAirports.add(id);
+    airportMarkers.push({ name: name || 'Place', coord });
+  };
   days.forEach(day => {
     day.flights.forEach(flight => {
-      [['origin', 'originCoord'], ['destination', 'destinationCoord']].forEach(([nameKey, coordKey]) => {
-        const coord = flight[coordKey];
-        const name = flight[nameKey];
-        if (coord && name) {
-          const id = `${coord[0]},${coord[1]}`;
-          if (!seenAirports.has(id)) {
-            seenAirports.add(id);
-            airportMarkers.push({ name, coord });
-          }
-        }
-      });
+      addAirportMarker(flight.origin, flight.originCoord);
+      addAirportMarker(flight.destination, flight.destinationCoord);
+    });
+    // Items promoted from ideas may carry a `coord` directly (excursions,
+    // dinners, etc.). Render those as markers too.
+    ['excursions', 'dinners', 'accommodations', 'ferries', 'carRentals'].forEach(category => {
+      (day[category] || []).forEach(item => addAirportMarker(item.name || item.company, item.coord));
     });
   });
 
@@ -980,6 +1140,8 @@ export default function HomePage() {
                       contextualAccommodations={accommodationsByDay[day.id] || []}
                       onAddItem={addItemToDay}
                       onRemoveItem={removeItemFromDay}
+                      onUpdateItem={updateItemInDay}
+                      onSendToIdeas={sendItemToIdeas}
                     />
 
                     {(() => {
@@ -995,7 +1157,7 @@ export default function HomePage() {
                                   <span><strong>{idea.name}</strong> — {idea.location}</span>
                                   {idea.notes && <span style={{ display: 'block', fontSize: '0.85em', opacity: 0.75 }}>{idea.notes}</span>}
                                 </div>
-                                <button onClick={() => promoteIdeaToDay(idea.id, day.id)} className="add-btn" title="Add to this day as excursion">
+                                <button onClick={() => startPromoteIdea(idea, day.id)} className="add-btn" title="Add to this day…">
                                   <Plus size={14} />
                                 </button>
                                 <button onClick={() => removeIdea(idea.id)} className="remove-btn" title="Discard idea">
@@ -1048,7 +1210,76 @@ export default function HomePage() {
         </div>
       </div>
 
-      <IdeasCard ideas={ideas} onAdd={addIdea} onRemove={removeIdea} />
+      <IdeasCard ideas={ideas} onAdd={addIdea} onUpdate={updateIdea} onRemove={removeIdea} />
+
+      {promoting && (() => {
+        const cfg = ITEM_TYPES[promoteCategory];
+        const isNotesField = (f) => f === 'notes';
+        const renderField = (field) => {
+          const isTime = TIME_FIELDS.has(field);
+          const isDate = /Date$/.test(field);
+          if (isNotesField(field)) {
+            return (
+              <textarea
+                rows={3}
+                value={promoteForm[field] || ''}
+                onChange={(e) => setPromoteForm({ ...promoteForm, [field]: e.target.value })}
+                placeholder="Notes…"
+                style={{ width: '100%', resize: 'vertical', fontFamily: 'inherit' }}
+              />
+            );
+          }
+          return (
+            <input
+              type={isTime ? 'time' : isDate ? 'date' : 'text'}
+              value={promoteForm[field] || ''}
+              onChange={(e) => setPromoteForm({ ...promoteForm, [field]: e.target.value })}
+              placeholder={isTime || isDate ? '' : `Enter ${field}`}
+            />
+          );
+        };
+        return (
+          <div className="modal-overlay" onClick={cancelPromote}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header">
+                <h3>Add &ldquo;{promoting.idea.name}&rdquo; to {days.find(d => d.id === promoting.dayId)?.date}</h3>
+                <button onClick={cancelPromote} className="close-btn">×</button>
+              </div>
+              <div className="modal-body">
+                <div className="form-group">
+                  <label>Category</label>
+                  <select value={promoteCategory} onChange={(e) => onPromoteCategoryChange(e.target.value)}>
+                    {Object.entries(ITEM_TYPES).map(([key, c]) => (
+                      <option key={key} value={key}>{c.label}</option>
+                    ))}
+                  </select>
+                </div>
+                {cfg.fields.map(field => (
+                  <div key={field} className="form-group">
+                    <label>{field.charAt(0).toUpperCase() + field.slice(1)}</label>
+                    {renderField(field)}
+                  </div>
+                ))}
+                {(cfg.detailFields || []).map(field => (
+                  <div key={field} className="form-group">
+                    <label>{field.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}</label>
+                    {renderField(field)}
+                  </div>
+                ))}
+                {promoteForm.coord && (
+                  <div className="form-group" style={{ fontSize: '0.85em', opacity: 0.7 }}>
+                    📍 Map coordinate carried over from idea ({promoteForm.coord[0].toFixed(3)}, {promoteForm.coord[1].toFixed(3)})
+                  </div>
+                )}
+              </div>
+              <div className="modal-footer">
+                <button onClick={cancelPromote} className="cancel-btn">Cancel</button>
+                <button onClick={submitPromote} className="add-btn">Add to day</button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       <section className="summary card">
         <h2>Planning summary</h2>
