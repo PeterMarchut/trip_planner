@@ -589,7 +589,12 @@ const ChronologicalItinerary = ({ day, contextualAccommodations = [], contextual
                          || (item.category === 'carRentals' && (item.role === 'in-use' || item.role === 'dropoff'));
 
           return (
-            <li key={itemKey} className="chronological-item" style={isDerived ? { opacity: 0.85 } : undefined}>
+            <li
+              key={itemKey}
+              className="chronological-item"
+              data-category={item.category}
+              style={isDerived ? { opacity: 0.85 } : undefined}
+            >
               <div className="item-time">{item.time || '—'}</div>
               <div className="item-content">
                 <div className="item-type">{item.label}</div>
@@ -1224,8 +1229,8 @@ export default function HomePage() {
       <header className="hero">
         <h1>🌍 Vacation Planner</h1>
         <p>Plan your trip day by day with an interactive map.</p>
-        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', position: 'absolute', top: '1rem', right: '1rem' }}>
-          <span style={{ fontSize: '0.8em', opacity: 0.7, padding: '0 0.5rem' }} title={`Sync: ${syncStatus}`}>
+        <div className="hero-actions">
+          <span className="sync-status" title={`Sync: ${syncStatus}`}>
             {syncStatus === 'loading' && '⏳ Loading…'}
             {syncStatus === 'saving' && '💾 Saving…'}
             {syncStatus === 'synced' && '✓ Synced'}

@@ -870,3 +870,88 @@ input {
     gap: 0.5rem;
   }
 }
+
+/* --- Category color coding for itinerary rows --- */
+:root {
+  --cat-flights:        #38bdf8;  /* sky */
+  --cat-ferries:        #14b8a6;  /* teal */
+  --cat-carRentals:     #f97316;  /* orange */
+  --cat-accommodations: #a855f7;  /* violet */
+  --cat-dinners:        #f43f5e;  /* rose */
+  --cat-excursions:     #10b981;  /* emerald */
+}
+.chronological-item[data-category="flights"]        { border-left-color: var(--cat-flights); }
+.chronological-item[data-category="ferries"]        { border-left-color: var(--cat-ferries); }
+.chronological-item[data-category="carRentals"]     { border-left-color: var(--cat-carRentals); }
+.chronological-item[data-category="accommodations"] { border-left-color: var(--cat-accommodations); }
+.chronological-item[data-category="dinners"]        { border-left-color: var(--cat-dinners); }
+.chronological-item[data-category="excursions"]     { border-left-color: var(--cat-excursions); }
+
+/* Tint the time + label to match for stronger scanning */
+.chronological-item[data-category="flights"]        .item-time,
+.chronological-item[data-category="flights"]        .item-type { color: var(--cat-flights); }
+.chronological-item[data-category="ferries"]        .item-time,
+.chronological-item[data-category="ferries"]        .item-type { color: var(--cat-ferries); }
+.chronological-item[data-category="carRentals"]     .item-time,
+.chronological-item[data-category="carRentals"]     .item-type { color: var(--cat-carRentals); }
+.chronological-item[data-category="accommodations"] .item-time,
+.chronological-item[data-category="accommodations"] .item-type { color: var(--cat-accommodations); }
+.chronological-item[data-category="dinners"]        .item-time,
+.chronological-item[data-category="dinners"]        .item-type { color: var(--cat-dinners); }
+.chronological-item[data-category="excursions"]     .item-time,
+.chronological-item[data-category="excursions"]     .item-type { color: var(--cat-excursions); }
+
+/* --- Header actions cluster (Sync status + Reset + theme toggle) --- */
+.hero-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+}
+.sync-status {
+  font-size: 0.8em;
+  opacity: 0.7;
+  padding: 0 0.5rem;
+}
+
+/* --- Responsive: stack the three-column main grid on narrow screens --- */
+@media (max-width: 900px) {
+  .page-shell {
+    width: calc(100% - 1rem);
+    padding: 1rem 0 3rem;
+  }
+  .main-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+  .hero {
+    padding: 1.5rem 1rem;
+    text-align: left;
+  }
+  .hero-actions {
+    position: static;
+    margin-top: 1rem;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+  .hero h1 {
+    font-size: 1.35rem;
+  }
+  .summary {
+    overflow-x: auto;
+  }
+  .summary pre {
+    font-size: 0.7rem;
+  }
+}
+
+@media (max-width: 600px) {
+  .modal-content { width: 96%; }
+  .modal-header,
+  .modal-body,
+  .modal-footer { padding: 1rem; }
+  .trip-nav-link { padding: 0.4rem 0.7rem; font-size: 0.85rem; }
+  .day-card { font-size: 0.8rem; }
+}
