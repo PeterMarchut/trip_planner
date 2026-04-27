@@ -3,6 +3,7 @@
 import { useMemo, useState, useRef, useEffect } from 'react';
 import { MapPin, Plane, Calendar, Plus, Trash2, ChevronDown, ChevronRight, Sun, Moon } from 'lucide-react';
 import dynamic from 'next/dynamic';
+import { authFetch, useOwnerToken } from './lib/auth';
 
 // Dynamic import for map to avoid SSR issues
 const MapContainer = dynamic(() => import('react-leaflet').then(mod => mod.MapContainer), { ssr: false });
@@ -149,7 +150,7 @@ const DetailsSection = ({ title, items, fields, onAdd, onRemove }) => {
 };
 
 // IdeasCard component — global list of unscheduled activity ideas
-const IdeasCard = ({ ideas, onAdd, onUpdate, onRemove }) => {
+const IdeasCard = ({ ideas, onAdd, onUpdate, onRemove, readOnly = false }) => {
   const [draft, setDraft] = useState({ name: '', location: '', notes: '', coord: null });
   const [editingId, setEditingId] = useState(null);
   const [pasteUrl, setPasteUrl] = useState('');
@@ -208,53 +209,57 @@ const IdeasCard = ({ ideas, onAdd, onUpdate, onRemove }) => {
       <div className="card-header">
         <h2>💡 Activity Ideas</h2>
       </div>
-      <div className="add-item" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.5rem' }}>
-        <input
-          value={pasteUrl}
-          onChange={e => setPasteUrl(e.target.value)}
-          placeholder="Paste a Google Maps link to import a place…"
-          style={{ flex: '1 1 320px' }}
-        />
-        <button onClick={handlePasteLookup} disabled={pasteStatus.loading || !pasteUrl.trim()} className="add-btn">
-          {pasteStatus.loading ? 'Loading…' : 'Load'}
-        </button>
-      </div>
-      {pasteStatus.error && (
-        <div style={{ color: '#ef4444', fontSize: '0.85em', marginBottom: '0.5rem' }}>{pasteStatus.error}</div>
+      {!readOnly && (
+        <>
+          <div className="add-item" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.5rem' }}>
+            <input
+              value={pasteUrl}
+              onChange={e => setPasteUrl(e.target.value)}
+              placeholder="Paste a Google Maps link to import a place…"
+              style={{ flex: '1 1 320px' }}
+            />
+            <button onClick={handlePasteLookup} disabled={pasteStatus.loading || !pasteUrl.trim()} className="add-btn">
+              {pasteStatus.loading ? 'Loading…' : 'Load'}
+            </button>
+          </div>
+          {pasteStatus.error && (
+            <div style={{ color: '#ef4444', fontSize: '0.85em', marginBottom: '0.5rem' }}>{pasteStatus.error}</div>
+          )}
+          {draft.coord && (
+            <div style={{ fontSize: '0.8em', opacity: 0.65, marginBottom: '0.4rem' }}>
+              📍 ({draft.coord[0].toFixed(4)}, {draft.coord[1].toFixed(4)})
+            </div>
+          )}
+          <div className="add-item" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
+            <input
+              value={draft.name}
+              onChange={e => setDraft({ ...draft, name: e.target.value })}
+              placeholder="Idea (e.g. Balos Beach)"
+              style={{ flex: '2 1 200px' }}
+            />
+            <input
+              value={draft.location}
+              onChange={e => setDraft({ ...draft, location: e.target.value })}
+              placeholder="Location (e.g. Chania)"
+              style={{ flex: '1 1 140px' }}
+            />
+            <input
+              value={draft.notes}
+              onChange={e => setDraft({ ...draft, notes: e.target.value })}
+              placeholder="Notes (optional)"
+              style={{ flex: '2 1 200px' }}
+            />
+            <button onClick={submit} className="add-btn" title={editingId != null ? 'Save changes' : 'Add idea'}>
+              {editingId != null ? '✓' : <Plus size={16} />}
+            </button>
+            {editingId != null && (
+              <button onClick={cancelEdit} className="cancel-btn">Cancel</button>
+            )}
+          </div>
+        </>
       )}
-      {draft.coord && (
-        <div style={{ fontSize: '0.8em', opacity: 0.65, marginBottom: '0.4rem' }}>
-          📍 ({draft.coord[0].toFixed(4)}, {draft.coord[1].toFixed(4)})
-        </div>
-      )}
-      <div className="add-item" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
-        <input
-          value={draft.name}
-          onChange={e => setDraft({ ...draft, name: e.target.value })}
-          placeholder="Idea (e.g. Balos Beach)"
-          style={{ flex: '2 1 200px' }}
-        />
-        <input
-          value={draft.location}
-          onChange={e => setDraft({ ...draft, location: e.target.value })}
-          placeholder="Location (e.g. Chania)"
-          style={{ flex: '1 1 140px' }}
-        />
-        <input
-          value={draft.notes}
-          onChange={e => setDraft({ ...draft, notes: e.target.value })}
-          placeholder="Notes (optional)"
-          style={{ flex: '2 1 200px' }}
-        />
-        <button onClick={submit} className="add-btn" title={editingId != null ? 'Save changes' : 'Add idea'}>
-          {editingId != null ? '✓' : <Plus size={16} />}
-        </button>
-        {editingId != null && (
-          <button onClick={cancelEdit} className="cancel-btn">Cancel</button>
-        )}
-      </div>
       {ideas.length === 0 ? (
-        <p style={{ opacity: 0.6, fontStyle: 'italic' }}>No ideas yet — add things you might want to do.</p>
+        <p style={{ opacity: 0.6, fontStyle: 'italic' }}>No ideas yet{readOnly ? '.' : ' — add things you might want to do.'}</p>
       ) : (
         <ul className="item-list" style={{ listStyle: 'none', padding: 0, margin: 0 }}>
           {ideas.map(idea => (
@@ -263,8 +268,12 @@ const IdeasCard = ({ ideas, onAdd, onUpdate, onRemove }) => {
                 <div><strong>{idea.name}</strong> <span style={{ opacity: 0.7 }}>· {idea.location}</span></div>
                 {idea.notes && <div style={{ fontSize: '0.85em', opacity: 0.75 }}>{idea.notes}</div>}
               </div>
-              <button onClick={() => startEdit(idea)} className="details-btn" style={{ padding: '2px 6px', fontSize: '0.78em' }} title="Edit">✎</button>
-              <button onClick={() => onRemove(idea.id)} className="remove-btn"><Trash2 size={12} /></button>
+              {!readOnly && (
+                <>
+                  <button onClick={() => startEdit(idea)} className="details-btn" style={{ padding: '2px 6px', fontSize: '0.78em' }} title="Edit">✎</button>
+                  <button onClick={() => onRemove(idea.id)} className="remove-btn"><Trash2 size={12} /></button>
+                </>
+              )}
             </li>
           ))}
         </ul>
@@ -274,7 +283,7 @@ const IdeasCard = ({ ideas, onAdd, onUpdate, onRemove }) => {
 };
 
 // ChronologicalItinerary component
-const ChronologicalItinerary = ({ day, contextualAccommodations = [], contextualCarRentals = [], onAddItem, onRemoveItem, onUpdateItem, onSendToIdeas }) => {
+const ChronologicalItinerary = ({ day, contextualAccommodations = [], contextualCarRentals = [], onAddItem, onRemoveItem, onUpdateItem, onSendToIdeas, readOnly = false }) => {
   const [newItemType, setNewItemType] = useState('flights');
   const [newItem, setNewItem] = useState({});
   const [expandedItems, setExpandedItems] = useState(new Set());
@@ -453,10 +462,12 @@ const ChronologicalItinerary = ({ day, contextualAccommodations = [], contextual
     <div className="chronological-itinerary">
       <div className="itinerary-header">
         <h4>Itinerary Items</h4>
-        <button onClick={() => setShowAddModal(true)} className="add-item-btn">
-          <Plus size={16} />
-          Add Item
-        </button>
+        {!readOnly && (
+          <button onClick={() => setShowAddModal(true)} className="add-item-btn">
+            <Plus size={16} />
+            Add Item
+          </button>
+        )}
       </div>
 
       {showAddModal && (
@@ -557,13 +568,15 @@ const ChronologicalItinerary = ({ day, contextualAccommodations = [], contextual
               <div className="item-details">
                 <span style={{ fontStyle: 'italic' }}>Unconfirmed — no car rental booked for this day</span>
               </div>
-              <button
-                onClick={() => onAddItem(day.id, 'carRentals', { company: 'Taxi/Uber', pickup: '', dropoff: '' })}
-                className="details-btn"
-                style={{ marginTop: '4px' }}
-              >
-                Mark as Taxi/Uber
-              </button>
+              {!readOnly && (
+                <button
+                  onClick={() => onAddItem(day.id, 'carRentals', { company: 'Taxi/Uber', pickup: '', dropoff: '' })}
+                  className="details-btn"
+                  style={{ marginTop: '4px' }}
+                >
+                  Mark as Taxi/Uber
+                </button>
+              )}
             </div>
           </li>
         )}
@@ -609,35 +622,37 @@ const ChronologicalItinerary = ({ day, contextualAccommodations = [], contextual
                   </div>
                 )}
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <button
-                  onClick={() => startEdit(item)}
-                  className="details-btn"
-                  title={isDerived ? 'Edit (changes apply to the booking)' : 'Edit'}
-                  style={{ padding: '2px 6px', fontSize: '0.78em' }}
-                >
-                  ✎
-                </button>
-                {canRemove && IDEA_RETURNABLE.has(item.category) && (
+              {!readOnly && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   <button
-                    onClick={() => onSendToIdeas(day.id, item.category, item.index)}
+                    onClick={() => startEdit(item)}
                     className="details-btn"
-                    title="Move back to Ideas list"
+                    title={isDerived ? 'Edit (changes apply to the booking)' : 'Edit'}
                     style={{ padding: '2px 6px', fontSize: '0.78em' }}
                   >
-                    💡
+                    ✎
                   </button>
-                )}
-                {canRemove && (
-                  <button
-                    onClick={() => onRemoveItem(item.hostDayId || day.id, item.category, item.index)}
-                    className="remove-btn"
-                    title="Remove"
-                  >
-                    <Trash2 size={12} />
-                  </button>
-                )}
-              </div>
+                  {canRemove && IDEA_RETURNABLE.has(item.category) && (
+                    <button
+                      onClick={() => onSendToIdeas(day.id, item.category, item.index)}
+                      className="details-btn"
+                      title="Move back to Ideas list"
+                      style={{ padding: '2px 6px', fontSize: '0.78em' }}
+                    >
+                      💡
+                    </button>
+                  )}
+                  {canRemove && (
+                    <button
+                      onClick={() => onRemoveItem(item.hostDayId || day.id, item.category, item.index)}
+                      className="remove-btn"
+                      title="Remove"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  )}
+                </div>
+              )}
             </li>
           );
         })}
@@ -708,6 +723,7 @@ export default function HomePage() {
   const [syncStatus, setSyncStatus] = useState('loading');
   const [hydrated, setHydrated] = useState(false);
   const lastSavedRef = useRef(null);
+  const { isOwner } = useOwnerToken();
 
   // Initial load: server first, fall back to localStorage cache, fall back to sample.
   useEffect(() => {
@@ -715,7 +731,7 @@ export default function HomePage() {
     (async () => {
       let loaded = false;
       try {
-        const res = await fetch('/api/trip', { cache: 'no-store' });
+        const res = await authFetch('/api/trip', { cache: 'no-store' });
         if (res.ok) {
           const body = await res.json();
           if (active && body && Array.isArray(body.days)) {
@@ -750,10 +766,16 @@ export default function HomePage() {
     try {
       window.localStorage.setItem(LOCAL_CACHE_KEY, payload);
     } catch {}
+    if (!isOwner) {
+      // Read-only: skip the server PUT but keep localStorage for cache.
+      lastSavedRef.current = payload;
+      setSyncStatus('readonly');
+      return;
+    }
     setSyncStatus('saving');
     const timer = setTimeout(async () => {
       try {
-        const res = await fetch('/api/trip', {
+        const res = await authFetch('/api/trip', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: payload
@@ -761,6 +783,8 @@ export default function HomePage() {
         if (res.ok) {
           lastSavedRef.current = payload;
           setSyncStatus('synced');
+        } else if (res.status === 403) {
+          setSyncStatus('forbidden');
         } else {
           setSyncStatus('offline');
         }
@@ -769,7 +793,7 @@ export default function HomePage() {
       }
     }, 800);
     return () => clearTimeout(timer);
-  }, [days, ideas, hydrated]);
+  }, [days, ideas, hydrated, isOwner]);
 
   const resetTripData = async () => {
     if (typeof window === 'undefined') return;
@@ -782,7 +806,7 @@ export default function HomePage() {
     setSelectedDayId(null);
     lastSavedRef.current = null;
     try {
-      await fetch('/api/trip', { method: 'DELETE' });
+      await authFetch('/api/trip', { method: 'DELETE' });
     } catch {}
   };
 
@@ -1206,10 +1230,14 @@ export default function HomePage() {
             {syncStatus === 'saving' && '💾 Saving…'}
             {syncStatus === 'synced' && '✓ Synced'}
             {syncStatus === 'offline' && '⚠ Offline'}
+            {syncStatus === 'readonly' && '👁 Read-only'}
+            {syncStatus === 'forbidden' && '🔒 Forbidden — sign in'}
           </span>
-          <button onClick={resetTripData} className="theme-toggle" style={{ position: 'static' }} title="Reset to sample data">
-            Reset
-          </button>
+          {isOwner && (
+            <button onClick={resetTripData} className="theme-toggle" style={{ position: 'static' }} title="Reset to sample data">
+              Reset
+            </button>
+          )}
           <button onClick={toggleTheme} className="theme-toggle" style={{ position: 'static' }}>
             {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
           </button>
@@ -1222,9 +1250,11 @@ export default function HomePage() {
             <div className="card-header">
               <Calendar className="icon" />
               <h2>Trip Days</h2>
-              <button onClick={addDay} className="add-btn">
-                <Plus size={16} />
-              </button>
+              {isOwner && (
+                <button onClick={addDay} className="add-btn">
+                  <Plus size={16} />
+                </button>
+              )}
             </div>
             <div className="days-container">
               {days.map((day) => (
@@ -1241,9 +1271,11 @@ export default function HomePage() {
                       <span className="end">{day.endLocation || 'End'}</span>
                     </div>
                   </div>
-                  <button onClick={(e) => { e.stopPropagation(); removeDay(day.id); }} className="remove-btn">
-                    <Trash2 size={14} />
-                  </button>
+                  {isOwner && (
+                    <button onClick={(e) => { e.stopPropagation(); removeDay(day.id); }} className="remove-btn">
+                      <Trash2 size={14} />
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
@@ -1265,6 +1297,7 @@ export default function HomePage() {
                           value={day.startLocation}
                           onChange={(e) => updateDay(day.id, 'startLocation', e.target.value)}
                           placeholder="Where the day starts"
+                          readOnly={!isOwner}
                         />
                       </label>
                       <label>
@@ -1273,6 +1306,7 @@ export default function HomePage() {
                           value={day.endLocation}
                           onChange={(e) => updateDay(day.id, 'endLocation', e.target.value)}
                           placeholder="Where the day ends"
+                          readOnly={!isOwner}
                         />
                       </label>
                       <label>
@@ -1281,6 +1315,7 @@ export default function HomePage() {
                           type="date"
                           value={day.date}
                           onChange={(e) => updateDay(day.id, 'date', e.target.value)}
+                          readOnly={!isOwner}
                         />
                       </label>
                     </div>
@@ -1293,6 +1328,7 @@ export default function HomePage() {
                       onRemoveItem={removeItemFromDay}
                       onUpdateItem={updateItemInDay}
                       onSendToIdeas={sendItemToIdeas}
+                      readOnly={!isOwner}
                     />
 
                     {(() => {
@@ -1308,12 +1344,16 @@ export default function HomePage() {
                                   <span><strong>{idea.name}</strong> — {idea.location}</span>
                                   {idea.notes && <span style={{ display: 'block', fontSize: '0.85em', opacity: 0.75 }}>{idea.notes}</span>}
                                 </div>
-                                <button onClick={() => startPromoteIdea(idea, day.id)} className="add-btn" title="Add to this day…">
-                                  <Plus size={14} />
-                                </button>
-                                <button onClick={() => removeIdea(idea.id)} className="remove-btn" title="Discard idea">
-                                  <Trash2 size={12} />
-                                </button>
+                                {isOwner && (
+                                  <>
+                                    <button onClick={() => startPromoteIdea(idea, day.id)} className="add-btn" title="Add to this day…">
+                                      <Plus size={14} />
+                                    </button>
+                                    <button onClick={() => removeIdea(idea.id)} className="remove-btn" title="Discard idea">
+                                      <Trash2 size={12} />
+                                    </button>
+                                  </>
+                                )}
                               </li>
                             ))}
                           </ul>
@@ -1361,7 +1401,7 @@ export default function HomePage() {
         </div>
       </div>
 
-      <IdeasCard ideas={ideas} onAdd={addIdea} onUpdate={updateIdea} onRemove={removeIdea} />
+      <IdeasCard ideas={ideas} onAdd={addIdea} onUpdate={updateIdea} onRemove={removeIdea} readOnly={!isOwner} />
 
       {promoting && (() => {
         const cfg = ITEM_TYPES[promoteCategory];

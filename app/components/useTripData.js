@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
+import { authFetch } from '../lib/auth';
 
 export function useTripData() {
   const [days, setDays] = useState([]);
@@ -10,7 +11,7 @@ export function useTripData() {
     let active = true;
     (async () => {
       try {
-        const res = await fetch('/api/trip', { cache: 'no-store' });
+        const res = await authFetch('/api/trip', { cache: 'no-store' });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const body = await res.json();
         if (!active) return;
