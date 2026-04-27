@@ -150,28 +150,56 @@ const DetailsSection = ({ title, items, fields, onAdd, onRemove }) => {
 
 // IdeasCard component — global list of unscheduled activity ideas
 const IdeasCard = ({ ideas, onAdd, onUpdate, onRemove }) => {
-  const [draft, setDraft] = useState({ name: '', location: '', notes: '' });
+  const [draft, setDraft] = useState({ name: '', location: '', notes: '', coord: null });
   const [editingId, setEditingId] = useState(null);
+  const [pasteUrl, setPasteUrl] = useState('');
+  const [pasteStatus, setPasteStatus] = useState({ loading: false, error: null });
 
   const submit = () => {
     if (!draft.name.trim() || !draft.location.trim()) return;
-    const payload = { name: draft.name.trim(), location: draft.location.trim(), notes: draft.notes.trim() };
+    const payload = {
+      name: draft.name.trim(),
+      location: draft.location.trim(),
+      notes: draft.notes.trim(),
+      coord: draft.coord || null
+    };
     if (editingId != null) {
       onUpdate(editingId, payload);
     } else {
       onAdd(payload);
     }
-    setDraft({ name: '', location: '', notes: '' });
+    setDraft({ name: '', location: '', notes: '', coord: null });
     setEditingId(null);
   };
 
+  const handlePasteLookup = async () => {
+    const url = pasteUrl.trim();
+    if (!url) return;
+    setPasteStatus({ loading: true, error: null });
+    try {
+      const res = await fetch(`/api/places/lookup?url=${encodeURIComponent(url)}`);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `Lookup failed (${res.status})`);
+      setDraft(prev => ({
+        name: data.name || prev.name || '',
+        location: data.location || prev.location || '',
+        notes: prev.notes || '',
+        coord: data.coord || null
+      }));
+      setPasteUrl('');
+      setPasteStatus({ loading: false, error: null });
+    } catch (err) {
+      setPasteStatus({ loading: false, error: err.message });
+    }
+  };
+
   const startEdit = (idea) => {
-    setDraft({ name: idea.name || '', location: idea.location || '', notes: idea.notes || '' });
+    setDraft({ name: idea.name || '', location: idea.location || '', notes: idea.notes || '', coord: idea.coord || null });
     setEditingId(idea.id);
   };
 
   const cancelEdit = () => {
-    setDraft({ name: '', location: '', notes: '' });
+    setDraft({ name: '', location: '', notes: '', coord: null });
     setEditingId(null);
   };
 
@@ -180,6 +208,25 @@ const IdeasCard = ({ ideas, onAdd, onUpdate, onRemove }) => {
       <div className="card-header">
         <h2>💡 Activity Ideas</h2>
       </div>
+      <div className="add-item" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.5rem' }}>
+        <input
+          value={pasteUrl}
+          onChange={e => setPasteUrl(e.target.value)}
+          placeholder="Paste a Google Maps link to import a place…"
+          style={{ flex: '1 1 320px' }}
+        />
+        <button onClick={handlePasteLookup} disabled={pasteStatus.loading || !pasteUrl.trim()} className="add-btn">
+          {pasteStatus.loading ? 'Loading…' : 'Load'}
+        </button>
+      </div>
+      {pasteStatus.error && (
+        <div style={{ color: '#ef4444', fontSize: '0.85em', marginBottom: '0.5rem' }}>{pasteStatus.error}</div>
+      )}
+      {draft.coord && (
+        <div style={{ fontSize: '0.8em', opacity: 0.65, marginBottom: '0.4rem' }}>
+          📍 ({draft.coord[0].toFixed(4)}, {draft.coord[1].toFixed(4)})
+        </div>
+      )}
       <div className="add-item" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
         <input
           value={draft.name}
