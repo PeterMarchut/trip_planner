@@ -33,7 +33,7 @@ export async function GET(request) {
     return Response.json({ error: 'AERODATABOX_API_KEY not configured' }, { status: 500 });
   }
 
-  const url = `https://aerodatabox.p.rapidapi.com/flights/number/${encodeURIComponent(number)}/${encodeURIComponent(date)}?withAircraftImage=false&withLocation=true`;
+  const url = `https://aerodatabox.p.rapidapi.com/flights/number/${encodeURIComponent(number)}/${encodeURIComponent(date)}?withAircraftImage=false&withLocation=true&dateLocalRole=Departure`;
 
   let res;
   try {

@@ -374,16 +374,20 @@ const ChronologicalItinerary = ({ day, contextualAccommodations = [], onAddItem,
                   </div>
                 );
               })}
-              {(itemTypes[newItemType].detailFields || []).map(field => (
-                <div key={field} className="form-group">
-                  <label>{field.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}</label>
-                  <input
-                    value={newItem[field] || ''}
-                    onChange={(e) => setNewItem({ ...newItem, [field]: e.target.value })}
-                    placeholder={`Enter ${field.replace(/([A-Z])/g, ' $1').toLowerCase()}`}
-                  />
-                </div>
-              ))}
+              {(itemTypes[newItemType].detailFields || []).map(field => {
+                const isDateField = /Date$/.test(field);
+                return (
+                  <div key={field} className="form-group">
+                    <label>{field.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}</label>
+                    <input
+                      type={isDateField ? 'date' : 'text'}
+                      value={newItem[field] || ''}
+                      onChange={(e) => setNewItem({ ...newItem, [field]: e.target.value })}
+                      placeholder={isDateField ? '' : `Enter ${field.replace(/([A-Z])/g, ' $1').toLowerCase()}`}
+                    />
+                  </div>
+                );
+              })}
             </div>
             <div className="modal-footer">
               <button onClick={() => setShowAddModal(false)} className="cancel-btn">Cancel</button>
