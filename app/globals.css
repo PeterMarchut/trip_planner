@@ -11,6 +11,96 @@
   --success: #10b981;
 }
 
+.trip-nav {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: var(--card-bg);
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(8px);
+}
+.trip-nav-inner {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.5rem 1rem;
+  max-width: 1400px;
+  margin: 0 auto;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+.trip-nav-link {
+  padding: 0.45rem 0.95rem;
+  border-radius: 6px;
+  text-decoration: none;
+  font-size: 0.92rem;
+  color: inherit;
+  opacity: 0.7;
+  transition: all 0.15s;
+}
+.trip-nav-link:hover { opacity: 1; background: rgba(148, 163, 184, 0.08); }
+.trip-nav-link.active {
+  opacity: 1;
+  background: var(--primary);
+  color: white;
+}
+
+.view-page {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 1.5rem 1rem 4rem;
+}
+.view-page h1 { margin: 0 0 1.5rem; }
+.timeline-day {
+  position: relative;
+  padding-left: 1.5rem;
+  border-left: 2px solid var(--border);
+  margin-bottom: 1.5rem;
+}
+.timeline-dot {
+  position: absolute;
+  left: -9px; top: 4px;
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  background: var(--primary);
+  border: 3px solid var(--card-bg);
+}
+.timeline-header {
+  font-weight: 600;
+  margin-bottom: 0.4rem;
+}
+.timeline-header .muted { opacity: 0.65; font-weight: normal; margin-left: 0.5rem; }
+.timeline-item {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.4rem 0;
+  font-size: 0.94rem;
+}
+.timeline-item .icon { width: 1.4em; }
+.timeline-item .time { font-variant-numeric: tabular-nums; opacity: 0.75; min-width: 3.2em; }
+.timeline-item .empty { opacity: 0.45; font-style: italic; }
+.booking-card {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.6rem;
+  background: rgba(148, 163, 184, 0.04);
+}
+.booking-card .booking-head {
+  display: flex; flex-wrap: wrap; gap: 0.4rem 1rem; align-items: baseline;
+  margin-bottom: 0.25rem;
+}
+.booking-card .booking-head strong { font-size: 1rem; }
+.booking-card .booking-head .date { opacity: 0.75; font-variant-numeric: tabular-nums; }
+.booking-card .booking-head .badge {
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  background: rgba(59, 130, 246, 0.15);
+  color: var(--primary);
+}
+.booking-card .booking-meta { font-size: 0.88rem; opacity: 0.8; line-height: 1.5; }
+.booking-card .booking-meta span { margin-right: 1rem; }
+
 [data-theme="light"] {
   color-scheme: light;
   color: #0f172a;

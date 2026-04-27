@@ -1,4 +1,5 @@
 import './globals.css';
+import Nav from './components/Nav';
 
 export const metadata = {
   title: 'Vacation Planner',
@@ -11,7 +12,10 @@ export default function RootLayout({ children }) {
       <head>
         <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
       </head>
-      <body>{children}</body>
+      <body>
+        <Nav />
+        {children}
+      </body>
     </html>
   );
 }
