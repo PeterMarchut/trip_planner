@@ -183,6 +183,7 @@ const ChronologicalItinerary = ({ day, contextualAccommodations = [], onAddItem,
         destination: data.destination || prev.destination || '',
         departure: data.departure || prev.departure || '',
         arrival: data.arrival || prev.arrival || '',
+        arrivalDate: data.arrivalDate || prev.arrivalDate || '',
         originCoord: data.originCoord || null,
         destinationCoord: data.destinationCoord || null
       }));
@@ -195,7 +196,7 @@ const ChronologicalItinerary = ({ day, contextualAccommodations = [], onAddItem,
   const itemTypes = {
     flights: {
       fields: ['airline', 'flightNumber', 'origin', 'destination', 'departure', 'arrival'],
-      detailFields: ['bookingVendor', 'confirmationNumber'],
+      detailFields: ['arrivalDate', 'bookingVendor', 'confirmationNumber'],
       timeField: 'departure',
       label: 'Flight'
     },
@@ -688,6 +689,25 @@ export default function HomePage() {
                 });
               }
             }
+            updated.sort((a, b) => a.date.localeCompare(b.date));
+          }
+        }
+      }
+
+      // Overnight flight: ensure the local-arrival date exists as a day.
+      if (category === 'flights' && item.arrivalDate) {
+        const departureDay = updated.find(d => d.id === dayId);
+        if (departureDay && /^\d{4}-\d{2}-\d{2}$/.test(item.arrivalDate) && item.arrivalDate !== departureDay.date) {
+          if (!updated.some(d => d.date === item.arrivalDate)) {
+            const arrivalLocation = departureDay.endLocation || item.destination || '';
+            const nextId = updated.length > 0 ? Math.max(...updated.map(d => d.id)) + 1 : 1;
+            updated.push({
+              id: nextId,
+              date: item.arrivalDate,
+              startLocation: arrivalLocation,
+              endLocation: arrivalLocation,
+              flights: [], ferries: [], carRentals: [], accommodations: [], dinners: [], excursions: []
+            });
             updated.sort((a, b) => a.date.localeCompare(b.date));
           }
         }

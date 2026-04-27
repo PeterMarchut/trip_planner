@@ -13,6 +13,12 @@ function extractLocalTime(localStr) {
   return match ? match[1] : '';
 }
 
+function extractLocalDate(localStr) {
+  if (!localStr) return '';
+  const match = localStr.match(/(\d{4}-\d{2}-\d{2})/);
+  return match ? match[1] : '';
+}
+
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const number = searchParams.get('number');
@@ -57,6 +63,9 @@ export async function GET(request) {
   const depAirport = dep.airport || {};
   const arrAirport = arr.airport || {};
 
+  const depLocalDate = extractLocalDate(dep.scheduledTime?.local);
+  const arrLocalDate = extractLocalDate(arr.scheduledTime?.local);
+
   return Response.json({
     airline: flight.airline?.name || '',
     flightNumber: (flight.number || number).replace(/\s+/g, ''),
@@ -65,6 +74,8 @@ export async function GET(request) {
     originCoord: depAirport.location ? [depAirport.location.lat, depAirport.location.lon] : null,
     destinationCoord: arrAirport.location ? [arrAirport.location.lat, arrAirport.location.lon] : null,
     departure: extractLocalTime(dep.scheduledTime?.local),
-    arrival: extractLocalTime(arr.scheduledTime?.local)
+    arrival: extractLocalTime(arr.scheduledTime?.local),
+    // Only set when arrival is on a different local date than departure (overnight flight)
+    arrivalDate: depLocalDate && arrLocalDate && depLocalDate !== arrLocalDate ? arrLocalDate : ''
   });
 }
