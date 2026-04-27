@@ -376,7 +376,7 @@ const ChronologicalItinerary = ({ day, contextualAccommodations = [], onAddItem,
     const hasContent = Object.values(newItem).some(v => typeof v === 'string' && v.trim());
     if (!hasContent) return;
     if (editing) {
-      onUpdateItem(day.id, editing.category, editing.index, newItem);
+      onUpdateItem(editing.dayId, editing.category, editing.index, newItem);
     } else {
       onAddItem(day.id, newItemType, newItem);
     }
@@ -386,14 +386,15 @@ const ChronologicalItinerary = ({ day, contextualAccommodations = [], onAddItem,
     setShowAddModal(false);
   };
 
-  const startEdit = (category, index) => {
-    const source = category === 'accommodations'
-      ? day.accommodations?.[index]
-      : day[category]?.[index];
-    if (!source) return;
+  const startEdit = (item) => {
+    // For accommodations on derived (middle/checkOut) rows, the data lives on
+    // the host day, not the current day. We carry the merged item back into
+    // the form, stripping our display-only metadata.
+    const { category, index, label, fields, role, hostDayId, time, icon, ...formData } = item;
+    const targetDayId = hostDayId || day.id;
     setNewItemType(category);
-    setNewItem({ ...source });
-    setEditing({ category, index });
+    setNewItem(formData);
+    setEditing({ category, index, dayId: targetDayId });
     setShowAddModal(true);
   };
 
@@ -522,6 +523,13 @@ const ChronologicalItinerary = ({ day, contextualAccommodations = [], onAddItem,
               <div className="item-details">
                 <span style={{ fontStyle: 'italic' }}>Unconfirmed — no car rental booked for this day</span>
               </div>
+              <button
+                onClick={() => onAddItem(day.id, 'carRentals', { company: 'Taxi/Uber', pickup: '', dropoff: '' })}
+                className="details-btn"
+                style={{ marginTop: '4px' }}
+              >
+                Mark as Taxi/Uber
+              </button>
             </div>
           </li>
         )}
@@ -566,26 +574,26 @@ const ChronologicalItinerary = ({ day, contextualAccommodations = [], onAddItem,
                   </div>
                 )}
               </div>
-              {canRemove && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <button
+                  onClick={() => startEdit(item)}
+                  className="details-btn"
+                  title={item.role === 'middle' || item.role === 'checkOut' ? 'Edit (changes apply to the booking)' : 'Edit'}
+                  style={{ padding: '2px 6px', fontSize: '0.78em' }}
+                >
+                  ✎
+                </button>
+                {canRemove && IDEA_RETURNABLE.has(item.category) && (
                   <button
-                    onClick={() => startEdit(item.category, item.index)}
+                    onClick={() => onSendToIdeas(day.id, item.category, item.index)}
                     className="details-btn"
-                    title="Edit"
+                    title="Move back to Ideas list"
                     style={{ padding: '2px 6px', fontSize: '0.78em' }}
                   >
-                    ✎
+                    💡
                   </button>
-                  {IDEA_RETURNABLE.has(item.category) && (
-                    <button
-                      onClick={() => onSendToIdeas(day.id, item.category, item.index)}
-                      className="details-btn"
-                      title="Move back to Ideas list"
-                      style={{ padding: '2px 6px', fontSize: '0.78em' }}
-                    >
-                      💡
-                    </button>
-                  )}
+                )}
+                {canRemove && (
                   <button
                     onClick={() => onRemoveItem(item.role === 'checkIn' ? item.hostDayId : day.id, item.category, item.index)}
                     className="remove-btn"
@@ -593,9 +601,8 @@ const ChronologicalItinerary = ({ day, contextualAccommodations = [], onAddItem,
                   >
                     <Trash2 size={12} />
                   </button>
-                </div>
-              )}
-              {!canRemove && <span style={{ width: '24px' }} />}
+                )}
+              </div>
             </li>
           );
         })}
