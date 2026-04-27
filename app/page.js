@@ -30,7 +30,7 @@ const ITEM_TYPES = {
   },
   carRentals: {
     fields: ['company', 'pickup', 'dropoff'],
-    detailFields: ['pickupAddress', 'dropoffAddress', 'bookingVendor', 'confirmationNumber', 'notes'],
+    detailFields: ['dropoffDate', 'pickupAddress', 'dropoffAddress', 'bookingVendor', 'confirmationNumber', 'notes'],
     timeField: 'pickup',
     label: 'Car Rental'
   },
@@ -274,7 +274,7 @@ const IdeasCard = ({ ideas, onAdd, onUpdate, onRemove }) => {
 };
 
 // ChronologicalItinerary component
-const ChronologicalItinerary = ({ day, contextualAccommodations = [], onAddItem, onRemoveItem, onUpdateItem, onSendToIdeas }) => {
+const ChronologicalItinerary = ({ day, contextualAccommodations = [], contextualCarRentals = [], onAddItem, onRemoveItem, onUpdateItem, onSendToIdeas }) => {
   const [newItemType, setNewItemType] = useState('flights');
   const [newItem, setNewItem] = useState({});
   const [expandedItems, setExpandedItems] = useState(new Set());
@@ -313,11 +313,12 @@ const ChronologicalItinerary = ({ day, contextualAccommodations = [], onAddItem,
 
   const itemTypes = ITEM_TYPES;
 
-  // Combine all items with metadata. Skip accommodations here — they're rendered
-  // contextually based on which night of the stay this day falls on.
+  // Combine all items with metadata. Skip accommodations and carRentals here —
+  // they're rendered contextually based on which segment of the stay/rental
+  // this day belongs to.
   const allItems = [];
   Object.entries(itemTypes).forEach(([category, config]) => {
-    if (category === 'accommodations') return;
+    if (category === 'accommodations' || category === 'carRentals') return;
     day[category].forEach((item, index) => {
       allItems.push({
         ...item,
@@ -350,6 +351,39 @@ const ChronologicalItinerary = ({ day, contextualAccommodations = [], onAddItem,
       ...acc,
       category: 'accommodations',
       index: accIndex,
+      time,
+      label,
+      fields,
+      role,
+      hostDayId
+    });
+  });
+
+  // Layer in car rentals relevant to *this* day with role-specific labels.
+  contextualCarRentals.forEach(({ cr, role, hostDayId, crIndex }) => {
+    let time, fields, label;
+    if (role === null) {
+      // Single-day rental — use defaults
+      time = cr.pickup || '';
+      fields = itemTypes.carRentals.fields;
+      label = itemTypes.carRentals.label;
+    } else if (role === 'pickup') {
+      time = cr.pickup || '';
+      fields = ['company'];
+      label = 'Car Rental – Pickup';
+    } else if (role === 'in-use') {
+      time = '';
+      fields = ['company'];
+      label = 'Car Rental – Ongoing';
+    } else { // dropoff
+      time = cr.dropoff || '';
+      fields = ['company'];
+      label = 'Car Rental – Drop-off';
+    }
+    allItems.push({
+      ...cr,
+      category: 'carRentals',
+      index: crIndex,
       time,
       label,
       fields,
@@ -515,7 +549,7 @@ const ChronologicalItinerary = ({ day, contextualAccommodations = [], onAddItem,
       )}
 
       <ul className="chronological-list">
-        {allItems.length > 0 && day.carRentals.length === 0 && (
+        {allItems.length > 0 && contextualCarRentals.length === 0 && (
           <li className="chronological-item" style={{ borderLeft: '3px solid #f59e0b', background: 'rgba(245, 158, 11, 0.06)' }}>
             <div className="item-time">—</div>
             <div className="item-content">
@@ -537,11 +571,12 @@ const ChronologicalItinerary = ({ day, contextualAccommodations = [], onAddItem,
           const itemKey = `${item.category}-${item.index}-${item.role || 'self'}`;
           const isExpanded = expandedItems.has(itemKey);
           const hasDetails = itemTypes[item.category].detailFields && itemTypes[item.category].detailFields.some(field => item[field]);
-          const canRemove = !item.role || item.role === 'checkIn';
-          const isDerivedAccommodation = item.category === 'accommodations' && (item.role === 'middle' || item.role === 'checkOut');
+          const canRemove = !item.role || item.role === 'checkIn' || item.role === 'pickup';
+          const isDerived = (item.category === 'accommodations' && (item.role === 'middle' || item.role === 'checkOut'))
+                         || (item.category === 'carRentals' && (item.role === 'in-use' || item.role === 'dropoff'));
 
           return (
-            <li key={itemKey} className="chronological-item" style={isDerivedAccommodation ? { opacity: 0.85 } : undefined}>
+            <li key={itemKey} className="chronological-item" style={isDerived ? { opacity: 0.85 } : undefined}>
               <div className="item-time">{item.time || '—'}</div>
               <div className="item-content">
                 <div className="item-type">{item.label}</div>
@@ -578,7 +613,7 @@ const ChronologicalItinerary = ({ day, contextualAccommodations = [], onAddItem,
                 <button
                   onClick={() => startEdit(item)}
                   className="details-btn"
-                  title={item.role === 'middle' || item.role === 'checkOut' ? 'Edit (changes apply to the booking)' : 'Edit'}
+                  title={isDerived ? 'Edit (changes apply to the booking)' : 'Edit'}
                   style={{ padding: '2px 6px', fontSize: '0.78em' }}
                 >
                   ✎
@@ -595,7 +630,7 @@ const ChronologicalItinerary = ({ day, contextualAccommodations = [], onAddItem,
                 )}
                 {canRemove && (
                   <button
-                    onClick={() => onRemoveItem(item.role === 'checkIn' ? item.hostDayId : day.id, item.category, item.index)}
+                    onClick={() => onRemoveItem(item.hostDayId || day.id, item.category, item.index)}
                     className="remove-btn"
                     title="Remove"
                   >
@@ -860,6 +895,35 @@ export default function HomePage() {
         }
       }
 
+      // Multi-day car rental: ensure every day from pickup through dropoff exists.
+      if (category === 'carRentals' && item.dropoffDate && /^\d{4}-\d{2}-\d{2}$/.test(item.dropoffDate)) {
+        const pickupDay = updated.find(d => d.id === dayId);
+        if (pickupDay && pickupDay.date) {
+          const base = new Date(pickupDay.date);
+          const dropoff = new Date(item.dropoffDate);
+          const dayDiff = Math.round((dropoff - base) / (24 * 60 * 60 * 1000));
+          if (dayDiff > 0) {
+            const stayLocation = pickupDay.endLocation || pickupDay.startLocation || '';
+            for (let i = 1; i <= dayDiff; i++) {
+              const t = new Date(base);
+              t.setDate(t.getDate() + i);
+              const dateStr = t.toISOString().split('T')[0];
+              if (!updated.some(d => d.date === dateStr)) {
+                const nextId = updated.length > 0 ? Math.max(...updated.map(d => d.id)) + 1 : 1;
+                updated.push({
+                  id: nextId,
+                  date: dateStr,
+                  startLocation: stayLocation,
+                  endLocation: stayLocation,
+                  flights: [], ferries: [], carRentals: [], accommodations: [], dinners: [], excursions: []
+                });
+              }
+            }
+            updated.sort((a, b) => a.date.localeCompare(b.date));
+          }
+        }
+      }
+
       return updated;
     });
   };
@@ -995,6 +1059,38 @@ export default function HomePage() {
           if (target) {
             const role = i === nights ? 'checkOut' : 'middle';
             (result[target.id] ||= []).push({ acc, role, hostDayId: hostDay.id, accIndex });
+          }
+        }
+      });
+    });
+    return result;
+  }, [days]);
+
+  // Same idea for car rentals: pickup on host day, in-use on every day in
+  // between, dropoff on the dropoffDate. Single-day rentals (no dropoffDate or
+  // dropoff equal to pickup) get role: null and render unchanged.
+  const carRentalsByDay = useMemo(() => {
+    const result = {};
+    days.forEach(hostDay => {
+      (hostDay.carRentals || []).forEach((cr, crIndex) => {
+        const hasMultiDay = cr.dropoffDate && /^\d{4}-\d{2}-\d{2}$/.test(cr.dropoffDate)
+          && cr.dropoffDate > hostDay.date;
+        if (!hasMultiDay) {
+          (result[hostDay.id] ||= []).push({ cr, role: null, hostDayId: hostDay.id, crIndex });
+          return;
+        }
+        const base = new Date(hostDay.date);
+        const dropoff = new Date(cr.dropoffDate);
+        const dayDiff = Math.round((dropoff - base) / (24 * 60 * 60 * 1000));
+        (result[hostDay.id] ||= []).push({ cr, role: 'pickup', hostDayId: hostDay.id, crIndex });
+        for (let i = 1; i <= dayDiff; i++) {
+          const t = new Date(base);
+          t.setDate(t.getDate() + i);
+          const dateStr = t.toISOString().split('T')[0];
+          const target = days.find(d => d.date === dateStr);
+          if (target) {
+            const role = i === dayDiff ? 'dropoff' : 'in-use';
+            (result[target.id] ||= []).push({ cr, role, hostDayId: hostDay.id, crIndex });
           }
         }
       });
@@ -1192,6 +1288,7 @@ export default function HomePage() {
                     <ChronologicalItinerary
                       day={day}
                       contextualAccommodations={accommodationsByDay[day.id] || []}
+                      contextualCarRentals={carRentalsByDay[day.id] || []}
                       onAddItem={addItemToDay}
                       onRemoveItem={removeItemFromDay}
                       onUpdateItem={updateItemInDay}
