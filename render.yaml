@@ -1,0 +1,8 @@
+services:
+  - type: web
+    name: vacation-planner
+    env: node
+    plan: starter
+    branch: main
+    buildCommand: npm install && npm run build
+    startCommand: npm run start

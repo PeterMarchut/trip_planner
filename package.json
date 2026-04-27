@@ -1,0 +1,21 @@
+{
+  "name": "vacation-planner",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --webpack",
+    "build": "next build --webpack",
+    "start": "next start -p 3000",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "ioredis": "^5.10.1",
+    "leaflet": "^1.9.4",
+    "lucide-react": "^1.11.0",
+    "mammoth": "^1.12.0",
+    "next": "16.2.4",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "react-leaflet": "^5.0.0"
+  }
+}

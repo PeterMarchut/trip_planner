@@ -1,0 +1,15 @@
+node_modules/
+.next/
+.env
+.env.local
+.env.*.local
+*.log
+.DS_Store
+.claude/
+.vscode/
+.idea/
+
+# private files (real booking data, source docs)
+private/
+family Greece trip.docx
+extracted_text.txt
