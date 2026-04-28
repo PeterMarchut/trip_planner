@@ -61,6 +61,54 @@ const TIME_FIELDS = new Set(['departure', 'arrival', 'pickup', 'dropoff', 'check
 // Categories that show "Save to Ideas" on their items.
 const IDEA_RETURNABLE = new Set(['excursions', 'dinners']);
 
+// Reusable Google Maps URL lookup row for the Add/Edit Item modal.
+const MapsLinkLookup = ({ label, hint = '(optional — fills name + map pin)', coord, onResult }) => {
+  const [url, setUrl] = useState('');
+  const [status, setStatus] = useState({ loading: false, error: null });
+
+  const lookup = async () => {
+    const u = url.trim();
+    if (!u) return;
+    setStatus({ loading: true, error: null });
+    try {
+      const res = await fetch(`/api/places/lookup?url=${encodeURIComponent(u)}`);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `Lookup failed (${res.status})`);
+      onResult(data);
+      setUrl('');
+      setStatus({ loading: false, error: null });
+    } catch (err) {
+      setStatus({ loading: false, error: err.message });
+    }
+  };
+
+  return (
+    <div className="form-group">
+      <label>{label} <span style={{ opacity: 0.6, fontWeight: 'normal' }}>{hint}</span></label>
+      <div style={{ display: 'flex', gap: '8px' }}>
+        <input
+          type="url"
+          value={url}
+          onChange={e => setUrl(e.target.value)}
+          placeholder="https://maps.app.goo.gl/..."
+          style={{ flex: 1 }}
+        />
+        <button type="button" onClick={lookup} disabled={status.loading || !url.trim()} className="add-btn">
+          {status.loading ? 'Looking up…' : 'Load'}
+        </button>
+      </div>
+      {status.error && (
+        <div style={{ color: '#ef4444', fontSize: '0.85em', marginTop: '4px' }}>{status.error}</div>
+      )}
+      {coord && Array.isArray(coord) && (
+        <div style={{ fontSize: '0.8em', opacity: 0.65, marginTop: '4px' }}>
+          📍 ({coord[0].toFixed(4)}, {coord[1].toFixed(4)})
+        </div>
+      )}
+    </div>
+  );
+};
+
 // City coordinates and aliases
 const cityCoords = {
   'Athens': [37.9838, 23.7275],
@@ -316,28 +364,6 @@ const ChronologicalItinerary = ({ day, contextualAccommodations = [], contextual
   const [showAddModal, setShowAddModal] = useState(false);
   const [lookup, setLookup] = useState({ loading: false, error: null });
   const [editing, setEditing] = useState(null); // { category, index } or null
-  const [pasteUrl, setPasteUrl] = useState('');
-  const [pasteStatus, setPasteStatus] = useState({ loading: false, error: null });
-
-  const handlePlaceLookup = async () => {
-    const url = pasteUrl.trim();
-    if (!url) return;
-    setPasteStatus({ loading: true, error: null });
-    try {
-      const res = await fetch(`/api/places/lookup?url=${encodeURIComponent(url)}`);
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || `Lookup failed (${res.status})`);
-      setNewItem(prev => ({
-        ...prev,
-        name: data.name || prev.name || '',
-        coord: data.coord || prev.coord || null
-      }));
-      setPasteUrl('');
-      setPasteStatus({ loading: false, error: null });
-    } catch (err) {
-      setPasteStatus({ loading: false, error: err.message });
-    }
-  };
 
   const handleFlightLookup = async () => {
     const number = (newItem.flightNumber || '').trim();
@@ -473,8 +499,6 @@ const ChronologicalItinerary = ({ day, contextualAccommodations = [], contextual
     }
     setNewItem({});
     setLookup({ loading: false, error: null });
-    setPasteUrl('');
-    setPasteStatus({ loading: false, error: null });
     setEditing(null);
     setShowAddModal(false);
   };
@@ -495,8 +519,6 @@ const ChronologicalItinerary = ({ day, contextualAccommodations = [], contextual
     setNewItem({});
     setEditing(null);
     setLookup({ loading: false, error: null });
-    setPasteUrl('');
-    setPasteStatus({ loading: false, error: null });
     setShowAddModal(false);
   };
 
@@ -539,34 +561,37 @@ const ChronologicalItinerary = ({ day, contextualAccommodations = [], contextual
                 </select>
               </div>
               {['accommodations', 'dinners', 'excursions'].includes(newItemType) && (
-                <div className="form-group">
-                  <label>Paste a Google Maps link <span style={{ opacity: 0.6, fontWeight: 'normal' }}>(optional — fills name + map pin)</span></label>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <input
-                      type="url"
-                      value={pasteUrl}
-                      onChange={e => setPasteUrl(e.target.value)}
-                      placeholder="https://maps.app.goo.gl/..."
-                      style={{ flex: 1 }}
-                    />
-                    <button
-                      type="button"
-                      onClick={handlePlaceLookup}
-                      disabled={pasteStatus.loading || !pasteUrl.trim()}
-                      className="add-btn"
-                    >
-                      {pasteStatus.loading ? 'Looking up…' : 'Load'}
-                    </button>
-                  </div>
-                  {pasteStatus.error && (
-                    <div style={{ color: '#ef4444', fontSize: '0.85em', marginTop: '4px' }}>{pasteStatus.error}</div>
-                  )}
-                  {newItem.coord && (
-                    <div style={{ fontSize: '0.8em', opacity: 0.65, marginTop: '4px' }}>
-                      📍 ({newItem.coord[0].toFixed(4)}, {newItem.coord[1].toFixed(4)})
-                    </div>
-                  )}
-                </div>
+                <MapsLinkLookup
+                  label="Paste a Google Maps link"
+                  coord={newItem.coord}
+                  onResult={(data) => setNewItem(prev => ({
+                    ...prev,
+                    name: data.name || prev.name || '',
+                    coord: data.coord || prev.coord || null
+                  }))}
+                />
+              )}
+              {newItemType === 'ferries' && (
+                <>
+                  <MapsLinkLookup
+                    label="Departure terminal"
+                    hint="(optional — places the departure pin at the actual port)"
+                    coord={newItem.departureCoord}
+                    onResult={(data) => setNewItem(prev => ({
+                      ...prev,
+                      departureCoord: data.coord || prev.departureCoord || null
+                    }))}
+                  />
+                  <MapsLinkLookup
+                    label="Arrival terminal"
+                    hint="(optional — places the arrival pin at the actual port)"
+                    coord={newItem.arrivalCoord}
+                    onResult={(data) => setNewItem(prev => ({
+                      ...prev,
+                      arrivalCoord: data.coord || prev.arrivalCoord || null
+                    }))}
+                  />
+                </>
               )}
               {itemTypes[newItemType].fields.map(field => {
                 const isFlightNumber = newItemType === 'flights' && field === 'flightNumber';
@@ -1280,7 +1305,11 @@ export default function HomePage() {
       addMarker(flight.origin, flight.originCoord, 'flights', day.id);
       addMarker(flight.destination, flight.destinationCoord, 'flights', day.id);
     });
-    ['excursions', 'dinners', 'accommodations', 'ferries', 'carRentals'].forEach(category => {
+    day.ferries.forEach(ferry => {
+      addMarker(ferry.origin, ferry.departureCoord, 'ferries', day.id);
+      addMarker(ferry.destination, ferry.arrivalCoord, 'ferries', day.id);
+    });
+    ['excursions', 'dinners', 'accommodations', 'carRentals'].forEach(category => {
       (day[category] || []).forEach(item => addMarker(item.name || item.company, item.coord, category, day.id));
     });
   });
@@ -1312,14 +1341,14 @@ export default function HomePage() {
       }
     });
 
-    // Ferry routes
+    // Ferry routes — prefer port coords if set, else city centers
     day.ferries.forEach(ferry => {
-      const originCoord = getCityCoords(ferry.origin);
-      const destCoord = getCityCoords(ferry.destination);
+      const originCoord = ferry.departureCoord || getCityCoords(ferry.origin);
+      const destCoord = ferry.arrivalCoord || getCityCoords(ferry.destination);
       if (originCoord && destCoord && !sameCoord(originCoord, destCoord)) {
         transportationRoutes.push({
           coords: [originCoord, destCoord],
-          color: '#10b981',
+          color: '#14b8a6',
           type: 'ferry'
         });
       }

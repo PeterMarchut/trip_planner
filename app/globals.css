@@ -231,6 +231,20 @@ input {
   display: flex;
   flex-direction: column;
   gap: .25rem;
+  max-height: calc(100vh - 14rem);
+  overflow-y: auto;
+  padding-right: 0.25rem;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.35) transparent;
+}
+.days-container::-webkit-scrollbar { width: 6px; }
+.days-container::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.35);
+  border-radius: 3px;
+}
+.days-container::-webkit-scrollbar-track { background: transparent; }
+.days-container::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.55);
 }
 
 .day-card {
