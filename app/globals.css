@@ -170,9 +170,9 @@ input {
 }
 
 .page-shell {
-  width: min(1400px, calc(100% - 2rem));
+  width: min(1600px, calc(100% - 1rem));
   margin: 0 auto;
-  padding: 2rem 0 4rem;
+  padding: 1.25rem 0 3rem;
 }
 
 .hero {
@@ -216,7 +216,7 @@ input {
 
 .main-grid {
   display: grid;
-  grid-template-columns: 250px minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: 340px minmax(0, 1fr) minmax(0, 1fr);
   gap: 0.5rem;
   margin-bottom: 2rem;
 }
@@ -292,13 +292,20 @@ input {
 
 .day-locations {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 0.25rem;
   font-size: 0.85rem;
   color: var(--text-muted);
   flex: 1;
   min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.day-locations .start,
+.day-locations .end {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .day-locations span {
@@ -728,7 +735,7 @@ input {
   background: var(--card-bg);
   border: 1px solid var(--border);
   border-radius: 1rem;
-  padding: 1.5rem;
+  padding: 1rem;
   box-shadow: 0 20px 40px rgba(15, 23, 42, 0.12);
 }
 
