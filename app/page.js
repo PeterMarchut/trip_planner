@@ -617,6 +617,30 @@ const ChronologicalItinerary = ({ day, contextualAccommodations = [], contextual
                   />
                 </>
               )}
+              {newItemType === 'carRentals' && (
+                <>
+                  <MapsLinkLookup
+                    label="Pickup location"
+                    hint="(optional — fills pickup address + map pin)"
+                    coord={newItem.pickupCoord}
+                    onResult={(data) => setNewItem(prev => ({
+                      ...prev,
+                      pickupCoord: data.coord || prev.pickupCoord || null,
+                      pickupAddress: data.address || prev.pickupAddress || ''
+                    }))}
+                  />
+                  <MapsLinkLookup
+                    label="Drop-off location"
+                    hint="(optional — fills drop-off address + map pin)"
+                    coord={newItem.dropoffCoord}
+                    onResult={(data) => setNewItem(prev => ({
+                      ...prev,
+                      dropoffCoord: data.coord || prev.dropoffCoord || null,
+                      dropoffAddress: data.address || prev.dropoffAddress || ''
+                    }))}
+                  />
+                </>
+              )}
               {itemTypes[newItemType].fields.map(field => {
                 const isFlightNumber = newItemType === 'flights' && field === 'flightNumber';
                 const isTimeField = TIME_FIELDS.has(field);
@@ -1359,7 +1383,11 @@ export default function HomePage() {
       addMarker(ferry.origin, ferry.departureCoord, 'ferries', day.id);
       addMarker(ferry.destination, ferry.arrivalCoord, 'ferries', day.id);
     });
-    ['excursions', 'dinners', 'accommodations', 'carRentals'].forEach(category => {
+    day.carRentals.forEach(cr => {
+      addMarker(`${cr.company || 'Rental'} pickup`, cr.pickupCoord, 'carRentals', day.id);
+      addMarker(`${cr.company || 'Rental'} drop-off`, cr.dropoffCoord, 'carRentals', day.id);
+    });
+    ['excursions', 'dinners', 'accommodations'].forEach(category => {
       (day[category] || []).forEach(item => addMarker(item.name || item.company, item.coord, category, day.id));
     });
   });
