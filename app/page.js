@@ -156,6 +156,25 @@ const IdeasCard = ({ ideas, onAdd, onUpdate, onRemove, readOnly = false }) => {
   const [pasteUrl, setPasteUrl] = useState('');
   const [pasteStatus, setPasteStatus] = useState({ loading: false, error: null });
 
+  // Group ideas by location, sort locations alphabetically (Unspecified last)
+  // and sort items within each location alphabetically by name.
+  const grouped = useMemo(() => {
+    const map = new Map();
+    ideas.forEach(idea => {
+      const loc = (idea.location || '').trim() || 'Unspecified';
+      if (!map.has(loc)) map.set(loc, []);
+      map.get(loc).push(idea);
+    });
+    for (const items of map.values()) {
+      items.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    }
+    return [...map.entries()].sort(([a], [b]) => {
+      if (a === 'Unspecified') return 1;
+      if (b === 'Unspecified') return -1;
+      return a.localeCompare(b);
+    });
+  }, [ideas]);
+
   const submit = () => {
     if (!draft.name.trim() || !draft.location.trim()) return;
     const payload = {
@@ -261,22 +280,29 @@ const IdeasCard = ({ ideas, onAdd, onUpdate, onRemove, readOnly = false }) => {
       {ideas.length === 0 ? (
         <p style={{ opacity: 0.6, fontStyle: 'italic' }}>No ideas yet{readOnly ? '.' : ' — add things you might want to do.'}</p>
       ) : (
-        <ul className="item-list" style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-          {ideas.map(idea => (
-            <li key={idea.id} className="item" style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', padding: '0.5rem 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-              <div style={{ flex: 1 }}>
-                <div><strong>{idea.name}</strong> <span style={{ opacity: 0.7 }}>· {idea.location}</span></div>
-                {idea.notes && <div style={{ fontSize: '0.85em', opacity: 0.75 }}>{idea.notes}</div>}
-              </div>
-              {!readOnly && (
-                <>
-                  <button onClick={() => startEdit(idea)} className="details-btn" style={{ padding: '2px 6px', fontSize: '0.78em' }} title="Edit">✎</button>
-                  <button onClick={() => onRemove(idea.id)} className="remove-btn"><Trash2 size={12} /></button>
-                </>
-              )}
-            </li>
-          ))}
-        </ul>
+        grouped.map(([location, items]) => (
+          <div key={location} style={{ marginBottom: '0.75rem' }}>
+            <div className="ideas-group-header">
+              {location} <span style={{ opacity: 0.6 }}>· {items.length}</span>
+            </div>
+            <ul className="item-list" style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+              {items.map(idea => (
+                <li key={idea.id} className="item" style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', padding: '0.4rem 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                  <div style={{ flex: 1 }}>
+                    <div><strong>{idea.name}</strong></div>
+                    {idea.notes && <div style={{ fontSize: '0.85em', opacity: 0.75 }}>{idea.notes}</div>}
+                  </div>
+                  {!readOnly && (
+                    <>
+                      <button onClick={() => startEdit(idea)} className="details-btn" style={{ padding: '2px 6px', fontSize: '0.78em' }} title="Edit">✎</button>
+                      <button onClick={() => onRemove(idea.id)} className="remove-btn"><Trash2 size={12} /></button>
+                    </>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))
       )}
     </section>
   );
