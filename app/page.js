@@ -753,8 +753,34 @@ export default function HomePage() {
   const [theme, setTheme] = useState('dark');
   const [syncStatus, setSyncStatus] = useState('loading');
   const [hydrated, setHydrated] = useState(false);
+  const [markerIcons, setMarkerIcons] = useState(null);
   const lastSavedRef = useRef(null);
   const { isOwner } = useOwnerToken();
+
+  // Build category-colored map markers once, client-side (Leaflet uses window).
+  useEffect(() => {
+    let active = true;
+    import('leaflet').then(({ default: L }) => {
+      if (!active) return;
+      const make = (color) => L.divIcon({
+        html: `<svg width="22" height="30" viewBox="0 0 22 30" xmlns="http://www.w3.org/2000/svg"><path d="M11 0C5 0 0 5 0 11c0 8 11 19 11 19s11-11 11-19c0-6-5-11-11-11z" fill="${color}" stroke="white" stroke-width="2"/><circle cx="11" cy="11" r="4" fill="white"/></svg>`,
+        className: 'category-marker',
+        iconSize: [22, 30],
+        iconAnchor: [11, 30],
+        popupAnchor: [0, -24]
+      });
+      setMarkerIcons({
+        flights:        make('#38bdf8'),
+        ferries:        make('#14b8a6'),
+        carRentals:     make('#f97316'),
+        accommodations: make('#a855f7'),
+        dinners:        make('#f43f5e'),
+        excursions:     make('#10b981'),
+        city:           make('#94a3b8')
+      });
+    }).catch(() => {});
+    return () => { active = false; };
+  }, []);
 
   // Initial load: server first, fall back to localStorage cache, fall back to sample.
   useEffect(() => {
@@ -1182,25 +1208,33 @@ export default function HomePage() {
   const mapLocations = [...allLocations];
   const routeCoords = mapLocations.map(loc => cityCoords[loc]);
 
-  // Airport markers from looked-up flight data (coords stored on the flight item)
-  const airportMarkers = [];
-  const seenAirports = new Set();
-  const addAirportMarker = (name, coord) => {
+  // Coord-anchored markers (flight airports + items with coords). Each carries
+  // its category color and the day to jump to when clicked.
+  const itemMarkers = [];
+  const seenMarkers = new Set();
+  const addMarker = (name, coord, category, dayId) => {
     if (!coord || !Array.isArray(coord) || coord.length !== 2) return;
     const id = `${coord[0]},${coord[1]}`;
-    if (seenAirports.has(id)) return;
-    seenAirports.add(id);
-    airportMarkers.push({ name: name || 'Place', coord });
+    if (seenMarkers.has(id)) return;
+    seenMarkers.add(id);
+    itemMarkers.push({ name: name || 'Place', coord, category, dayId });
   };
   days.forEach(day => {
     day.flights.forEach(flight => {
-      addAirportMarker(flight.origin, flight.originCoord);
-      addAirportMarker(flight.destination, flight.destinationCoord);
+      addMarker(flight.origin, flight.originCoord, 'flights', day.id);
+      addMarker(flight.destination, flight.destinationCoord, 'flights', day.id);
     });
-    // Items promoted from ideas may carry a `coord` directly (excursions,
-    // dinners, etc.). Render those as markers too.
     ['excursions', 'dinners', 'accommodations', 'ferries', 'carRentals'].forEach(category => {
-      (day[category] || []).forEach(item => addAirportMarker(item.name || item.company, item.coord));
+      (day[category] || []).forEach(item => addMarker(item.name || item.company, item.coord, category, day.id));
+    });
+  });
+
+  // Map city name → first day visiting that city (start or end).
+  const cityToFirstDay = {};
+  days.forEach(day => {
+    [day.startLocation, day.endLocation].forEach(loc => {
+      const key = getCityKey(loc);
+      if (key && !(key in cityToFirstDay)) cityToFirstDay[key] = day.id;
     });
   });
 
@@ -1407,14 +1441,27 @@ export default function HomePage() {
                   url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                   attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                 />
-                {mapLocations.map((loc, index) => (
-                  <Marker key={`city-${index}`} position={cityCoords[loc]}>
-                    <Popup>{loc}</Popup>
-                  </Marker>
-                ))}
-                {airportMarkers.map((airport, index) => (
-                  <Marker key={`airport-${index}`} position={airport.coord}>
-                    <Popup>{airport.name}</Popup>
+                {mapLocations.map((loc, index) => {
+                  const dayId = cityToFirstDay[loc];
+                  return (
+                    <Marker
+                      key={`city-${index}`}
+                      position={cityCoords[loc]}
+                      icon={markerIcons?.city}
+                      eventHandlers={dayId ? { click: () => selectDay(dayId) } : undefined}
+                    >
+                      <Popup>{loc}</Popup>
+                    </Marker>
+                  );
+                })}
+                {itemMarkers.map((m, index) => (
+                  <Marker
+                    key={`item-${index}`}
+                    position={m.coord}
+                    icon={markerIcons?.[m.category]}
+                    eventHandlers={m.dayId ? { click: () => selectDay(m.dayId) } : undefined}
+                  >
+                    <Popup>{m.name}</Popup>
                   </Marker>
                 ))}
                 {transportationRoutes.map((route, index) => (

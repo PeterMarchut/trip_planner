@@ -901,6 +901,13 @@ input {
 .chronological-item[data-category="excursions"]     .item-time,
 .chronological-item[data-category="excursions"]     .item-type { color: var(--cat-excursions); }
 
+/* Category-colored map markers (Leaflet divIcon) — no default chrome */
+.category-marker {
+  background: transparent !important;
+  border: none !important;
+}
+.category-marker:hover { filter: brightness(1.15); cursor: pointer; }
+
 /* Ideas list — group headers */
 .ideas-group-header {
   font-size: 0.78em;
