@@ -316,6 +316,28 @@ const ChronologicalItinerary = ({ day, contextualAccommodations = [], contextual
   const [showAddModal, setShowAddModal] = useState(false);
   const [lookup, setLookup] = useState({ loading: false, error: null });
   const [editing, setEditing] = useState(null); // { category, index } or null
+  const [pasteUrl, setPasteUrl] = useState('');
+  const [pasteStatus, setPasteStatus] = useState({ loading: false, error: null });
+
+  const handlePlaceLookup = async () => {
+    const url = pasteUrl.trim();
+    if (!url) return;
+    setPasteStatus({ loading: true, error: null });
+    try {
+      const res = await fetch(`/api/places/lookup?url=${encodeURIComponent(url)}`);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `Lookup failed (${res.status})`);
+      setNewItem(prev => ({
+        ...prev,
+        name: data.name || prev.name || '',
+        coord: data.coord || prev.coord || null
+      }));
+      setPasteUrl('');
+      setPasteStatus({ loading: false, error: null });
+    } catch (err) {
+      setPasteStatus({ loading: false, error: err.message });
+    }
+  };
 
   const handleFlightLookup = async () => {
     const number = (newItem.flightNumber || '').trim();
@@ -451,6 +473,8 @@ const ChronologicalItinerary = ({ day, contextualAccommodations = [], contextual
     }
     setNewItem({});
     setLookup({ loading: false, error: null });
+    setPasteUrl('');
+    setPasteStatus({ loading: false, error: null });
     setEditing(null);
     setShowAddModal(false);
   };
@@ -471,6 +495,8 @@ const ChronologicalItinerary = ({ day, contextualAccommodations = [], contextual
     setNewItem({});
     setEditing(null);
     setLookup({ loading: false, error: null });
+    setPasteUrl('');
+    setPasteStatus({ loading: false, error: null });
     setShowAddModal(false);
   };
 
@@ -512,6 +538,36 @@ const ChronologicalItinerary = ({ day, contextualAccommodations = [], contextual
                   ))}
                 </select>
               </div>
+              {['accommodations', 'dinners', 'excursions'].includes(newItemType) && (
+                <div className="form-group">
+                  <label>Paste a Google Maps link <span style={{ opacity: 0.6, fontWeight: 'normal' }}>(optional — fills name + map pin)</span></label>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <input
+                      type="url"
+                      value={pasteUrl}
+                      onChange={e => setPasteUrl(e.target.value)}
+                      placeholder="https://maps.app.goo.gl/..."
+                      style={{ flex: 1 }}
+                    />
+                    <button
+                      type="button"
+                      onClick={handlePlaceLookup}
+                      disabled={pasteStatus.loading || !pasteUrl.trim()}
+                      className="add-btn"
+                    >
+                      {pasteStatus.loading ? 'Looking up…' : 'Load'}
+                    </button>
+                  </div>
+                  {pasteStatus.error && (
+                    <div style={{ color: '#ef4444', fontSize: '0.85em', marginTop: '4px' }}>{pasteStatus.error}</div>
+                  )}
+                  {newItem.coord && (
+                    <div style={{ fontSize: '0.8em', opacity: 0.65, marginTop: '4px' }}>
+                      📍 ({newItem.coord[0].toFixed(4)}, {newItem.coord[1].toFixed(4)})
+                    </div>
+                  )}
+                </div>
+              )}
               {itemTypes[newItemType].fields.map(field => {
                 const isFlightNumber = newItemType === 'flights' && field === 'flightNumber';
                 const isTimeField = TIME_FIELDS.has(field);
