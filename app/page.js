@@ -357,7 +357,7 @@ const IdeasCard = ({ ideas, onAdd, onUpdate, onRemove, readOnly = false }) => {
 };
 
 // ChronologicalItinerary component
-const ChronologicalItinerary = ({ day, contextualAccommodations = [], contextualCarRentals = [], onAddItem, onRemoveItem, onUpdateItem, onSendToIdeas, readOnly = false }) => {
+const ChronologicalItinerary = ({ day, contextualAccommodations = [], contextualCarRentals = [], onAddItem, onRemoveItem, onUpdateItem, onSendToIdeas, readOnly = false, initialEdit = null, onInitialEditConsumed }) => {
   const [newItemType, setNewItemType] = useState('flights');
   const [newItem, setNewItem] = useState({});
   const [expandedItems, setExpandedItems] = useState(new Set());
@@ -514,6 +514,25 @@ const ChronologicalItinerary = ({ day, contextualAccommodations = [], contextual
     setEditing({ category, index, dayId: targetDayId });
     setShowAddModal(true);
   };
+
+  // Honor a deep-link initialEdit (passed from the Planning page when navigated
+  // here from a view-page card's Edit button). Lookup the source item by
+  // category+index and open the modal once.
+  useEffect(() => {
+    if (!initialEdit || readOnly) return;
+    const { category, index } = initialEdit;
+    const source = day[category]?.[index];
+    if (!source) {
+      onInitialEditConsumed?.();
+      return;
+    }
+    setNewItemType(category);
+    setNewItem({ ...source });
+    setEditing({ category, index, dayId: day.id });
+    setShowAddModal(true);
+    onInitialEditConsumed?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialEdit?.category, initialEdit?.index]);
 
   const cancelModal = () => {
     setNewItem({});
@@ -842,6 +861,28 @@ export default function HomePage() {
   const [markerIcons, setMarkerIcons] = useState(null);
   const lastSavedRef = useRef(null);
   const { isOwner } = useOwnerToken();
+  // Deep-link support: ?day=X&edit=cat:idx — opens a day's edit modal on mount.
+  // The view pages link here to let users jump from a card directly into edit.
+  const [initialEdit, setInitialEdit] = useState(null);
+  useEffect(() => {
+    if (!hydrated || typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const dayParam = params.get('day');
+    const editParam = params.get('edit');
+    if (!dayParam) return;
+    const dayId = parseInt(dayParam, 10);
+    if (!Number.isFinite(dayId)) return;
+    setSelectedDayId(dayId);
+    if (editParam) {
+      const [category, idxStr] = editParam.split(':');
+      const index = parseInt(idxStr, 10);
+      if (category && Number.isFinite(index)) {
+        setInitialEdit({ category, index });
+      }
+    }
+    // Clear params so the next interaction doesn't re-trigger.
+    window.history.replaceState(null, '', '/');
+  }, [hydrated]);
 
   // Build category-colored map markers once, client-side (Leaflet uses window).
   useEffect(() => {
@@ -1484,6 +1525,8 @@ export default function HomePage() {
                       onUpdateItem={updateItemInDay}
                       onSendToIdeas={sendItemToIdeas}
                       readOnly={!isOwner}
+                      initialEdit={day.id === selectedDayId ? initialEdit : null}
+                      onInitialEditConsumed={() => setInitialEdit(null)}
                     />
 
                     {(() => {

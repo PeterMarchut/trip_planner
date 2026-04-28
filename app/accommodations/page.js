@@ -1,9 +1,12 @@
 'use client';
+import Link from 'next/link';
 import { useTripData } from '../components/useTripData';
+import { useOwnerToken } from '../lib/auth';
 import { collectByCategory, formatDate } from '../lib/trip-utils';
 
 export default function AccommodationsPage() {
   const { days, status } = useTripData();
+  const { isOwner } = useOwnerToken();
   if (status === 'loading') return <main className="view-page">Loading…</main>;
   if (status === 'error') return <main className="view-page">Could not load trip data.</main>;
 
@@ -31,6 +34,16 @@ export default function AccommodationsPage() {
                 {formatDate(it.date)}
                 {checkOutDate ? ` → ${formatDate(checkOutDate)}` : ''}
               </span>
+              {isOwner && (
+                <Link
+                  href={`/?day=${it.dayId}&edit=${it.category}:${it.index}`}
+                  className="details-btn"
+                  style={{ marginLeft: 'auto', textDecoration: 'none', padding: '2px 8px', fontSize: '0.78em' }}
+                  title="Edit on the Planning page"
+                >
+                  ✎ Edit
+                </Link>
+              )}
             </div>
             <div className="booking-meta">
               {it.checkIn && <span>Check-in: {it.checkIn}</span>}

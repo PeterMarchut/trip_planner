@@ -1,11 +1,14 @@
 'use client';
+import Link from 'next/link';
 import { useTripData } from '../components/useTripData';
+import { useOwnerToken } from '../lib/auth';
 import { collectByCategory, formatDate } from '../lib/trip-utils';
 
 const CATEGORY_LABEL = { flights: 'Flight', ferries: 'Ferry', carRentals: 'Car Rental' };
 
 export default function TransportationPage() {
   const { days, status } = useTripData();
+  const { isOwner } = useOwnerToken();
   if (status === 'loading') return <main className="view-page">Loading…</main>;
   if (status === 'error') return <main className="view-page">Could not load trip data.</main>;
 
@@ -30,6 +33,16 @@ export default function TransportationPage() {
               <strong>{title}</strong>
               <span className="date">{formatDate(it.date)}</span>
               {time && <span className="date">{time}{endTime ? `–${endTime}` : ''}</span>}
+              {isOwner && (
+                <Link
+                  href={`/?day=${it.dayId}&edit=${it.category}:${it.index}`}
+                  className="details-btn"
+                  style={{ marginLeft: 'auto', textDecoration: 'none', padding: '2px 8px', fontSize: '0.78em' }}
+                  title="Edit on the Planning page"
+                >
+                  ✎ Edit
+                </Link>
+              )}
             </div>
             <div className="booking-meta">
               {route && <span>{route}</span>}
