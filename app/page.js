@@ -872,6 +872,11 @@ export default function HomePage() {
     if (!dayParam) return;
     const dayId = parseInt(dayParam, 10);
     if (!Number.isFinite(dayId)) return;
+    if (!days.some(d => d.id === dayId)) {
+      // Day no longer exists — clear params and bail.
+      window.history.replaceState(null, '', '/');
+      return;
+    }
     setSelectedDayId(dayId);
     if (editParam) {
       const [category, idxStr] = editParam.split(':');
@@ -882,6 +887,7 @@ export default function HomePage() {
     }
     // Clear params so the next interaction doesn't re-trigger.
     window.history.replaceState(null, '', '/');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hydrated]);
 
   // Build category-colored map markers once, client-side (Leaflet uses window).
@@ -1484,6 +1490,7 @@ export default function HomePage() {
               <h2>Day Details - {days.find(d => d.id === selectedDayId)?.date}</h2>
               {(() => {
                 const day = days.find(d => d.id === selectedDayId);
+                if (!day) return <p style={{ opacity: 0.6, fontStyle: 'italic' }}>Day not found.</p>;
                 return (
                   <div className="day-details-full">
                     <div className="basic-info">
