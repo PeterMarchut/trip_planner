@@ -36,7 +36,7 @@ export default function AccommodationsPage() {
               </span>
               {isOwner && (
                 <Link
-                  href={`/?day=${it.dayId}&edit=${it.category}:${it.index}`}
+                  href={`/?day=${it.dayId}&editCategory=${it.category}&editIndex=${it.index}`}
                   className="details-btn"
                   style={{ marginLeft: 'auto', textDecoration: 'none', padding: '2px 8px', fontSize: '0.78em' }}
                   title="Edit on the Planning page"

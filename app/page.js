@@ -868,24 +868,22 @@ export default function HomePage() {
     if (!hydrated || typeof window === 'undefined') return;
     const params = new URLSearchParams(window.location.search);
     const dayParam = params.get('day');
-    const editParam = params.get('edit');
+    const editCategory = params.get('editCategory');
+    const editIndexParam = params.get('editIndex');
     if (!dayParam) return;
     const dayId = parseInt(dayParam, 10);
     if (!Number.isFinite(dayId)) return;
     if (!days.some(d => d.id === dayId)) {
-      // Day no longer exists — clear params and bail.
       window.history.replaceState(null, '', '/');
       return;
     }
     setSelectedDayId(dayId);
-    if (editParam) {
-      const [category, idxStr] = editParam.split(':');
-      const index = parseInt(idxStr, 10);
-      if (category && Number.isFinite(index)) {
-        setInitialEdit({ category, index });
+    if (editCategory && editIndexParam !== null) {
+      const index = parseInt(editIndexParam, 10);
+      if (Number.isFinite(index)) {
+        setInitialEdit({ category: editCategory, index });
       }
     }
-    // Clear params so the next interaction doesn't re-trigger.
     window.history.replaceState(null, '', '/');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hydrated]);
