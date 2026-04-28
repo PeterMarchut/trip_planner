@@ -43,13 +43,13 @@ const ITEM_TYPES = {
   },
   dinners: {
     fields: ['name', 'time'],
-    detailFields: ['address', 'bookingVendor', 'confirmationNumber', 'notes'],
+    detailFields: ['address', 'phone', 'bookingVendor', 'confirmationNumber', 'notes'],
     timeField: 'time',
     label: 'Dinner'
   },
   excursions: {
     fields: ['name', 'time'],
-    detailFields: ['address', 'bookingVendor', 'confirmationNumber', 'notes'],
+    detailFields: ['address', 'phone', 'bookingVendor', 'confirmationNumber', 'notes'],
     timeField: 'time',
     label: 'Excursion'
   }
@@ -563,10 +563,13 @@ const ChronologicalItinerary = ({ day, contextualAccommodations = [], contextual
               {['accommodations', 'dinners', 'excursions'].includes(newItemType) && (
                 <MapsLinkLookup
                   label="Paste a Google Maps link"
+                  hint="(optional — fills name, address, phone, and map pin)"
                   coord={newItem.coord}
                   onResult={(data) => setNewItem(prev => ({
                     ...prev,
                     name: data.name || prev.name || '',
+                    address: data.address || prev.address || '',
+                    phone: data.phone || prev.phone || '',
                     coord: data.coord || prev.coord || null
                   }))}
                 />
@@ -575,20 +578,22 @@ const ChronologicalItinerary = ({ day, contextualAccommodations = [], contextual
                 <>
                   <MapsLinkLookup
                     label="Departure terminal"
-                    hint="(optional — places the departure pin at the actual port)"
+                    hint="(optional — fills departure address + map pin)"
                     coord={newItem.departureCoord}
                     onResult={(data) => setNewItem(prev => ({
                       ...prev,
-                      departureCoord: data.coord || prev.departureCoord || null
+                      departureCoord: data.coord || prev.departureCoord || null,
+                      departureAddress: data.address || prev.departureAddress || ''
                     }))}
                   />
                   <MapsLinkLookup
                     label="Arrival terminal"
-                    hint="(optional — places the arrival pin at the actual port)"
+                    hint="(optional — fills arrival address + map pin)"
                     coord={newItem.arrivalCoord}
                     onResult={(data) => setNewItem(prev => ({
                       ...prev,
-                      arrivalCoord: data.coord || prev.arrivalCoord || null
+                      arrivalCoord: data.coord || prev.arrivalCoord || null,
+                      arrivalAddress: data.address || prev.arrivalAddress || ''
                     }))}
                   />
                 </>

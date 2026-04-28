@@ -31,6 +31,37 @@ function nearestCity(lat, lon) {
   return { city: best, distanceKm: bestDist };
 }
 
+async function reverseGeocode(lat, lon) {
+  const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&addressdetails=1&extratags=1`;
+  try {
+    const res = await fetch(url, {
+      headers: {
+        'User-Agent': 'vacation-planner/1.0',
+        'Accept-Language': 'en'
+      }
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+function formatAddress(reverse) {
+  if (!reverse) return '';
+  const a = reverse.address || {};
+  const street = [a.house_number, a.road].filter(Boolean).join(' ');
+  const city = a.city || a.town || a.village || a.suburb || a.municipality || '';
+  return [street, city, a.postcode, a.country].filter(Boolean).join(', ');
+}
+
+function extractPhone(reverse) {
+  if (!reverse || !reverse.extratags) return '';
+  return reverse.extratags.phone
+      || reverse.extratags['contact:phone']
+      || '';
+}
+
 function parseGoogleMapsUrl(urlStr) {
   let name = '';
   let coord = null;
@@ -88,14 +119,21 @@ export async function GET(request) {
   }
 
   let location = '';
+  let address = '';
+  let phone = '';
   if (parsed.coord) {
     const { city, distanceKm } = nearestCity(parsed.coord[0], parsed.coord[1]);
     if (distanceKm < 200) location = city;
+    const reverse = await reverseGeocode(parsed.coord[0], parsed.coord[1]);
+    address = formatAddress(reverse);
+    phone = extractPhone(reverse);
   }
 
   return Response.json({
     name: parsed.name || '',
     coord: parsed.coord || null,
-    location
+    location,
+    address,
+    phone
   });
 }
