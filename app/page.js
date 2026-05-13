@@ -1607,29 +1607,32 @@ export default function HomePage() {
                   url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                   attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                 />
-                {mapLocations.map((loc, index) => {
+                {markerIcons && mapLocations.map((loc, index) => {
                   const dayId = cityToFirstDay[loc];
                   return (
                     <Marker
                       key={`city-${index}`}
                       position={cityCoords[loc]}
-                      icon={markerIcons?.city}
+                      icon={markerIcons.city}
                       eventHandlers={dayId ? { click: () => selectDay(dayId) } : undefined}
                     >
                       <Popup>{loc}</Popup>
                     </Marker>
                   );
                 })}
-                {itemMarkers.map((m, index) => (
-                  <Marker
-                    key={`item-${index}`}
-                    position={m.coord}
-                    icon={markerIcons?.[m.category]}
-                    eventHandlers={m.dayId ? { click: () => selectDay(m.dayId) } : undefined}
-                  >
-                    <Popup>{m.name}</Popup>
-                  </Marker>
-                ))}
+                {markerIcons && itemMarkers.map((m, index) => {
+                  const icon = markerIcons[m.category] || markerIcons.city;
+                  return (
+                    <Marker
+                      key={`item-${index}`}
+                      position={m.coord}
+                      icon={icon}
+                      eventHandlers={m.dayId ? { click: () => selectDay(m.dayId) } : undefined}
+                    >
+                      <Popup>{m.name}</Popup>
+                    </Marker>
+                  );
+                })}
                 {transportationRoutes.map((route, index) => (
                   <Polyline 
                     key={index} 
