@@ -1412,7 +1412,7 @@ export default function HomePage() {
       if (originCoord && destCoord && !sameCoord(originCoord, destCoord)) {
         transportationRoutes.push({
           coords: [originCoord, destCoord],
-          color: '#f59e0b',
+          color: '#38bdf8',
           type: 'flight',
           dashArray: '8 6'
         });
