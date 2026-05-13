@@ -926,7 +926,7 @@ export default function HomePage() {
       });
       setMarkerIcons({
         flights:        make('#38bdf8'),
-        ferries:        make('#14b8a6'),
+        ferries:        make('#1e3a8a'),
         carRentals:     make('#f97316'),
         accommodations: make('#a855f7'),
         dinners:        make('#f43f5e'),
@@ -1426,7 +1426,7 @@ export default function HomePage() {
       if (originCoord && destCoord && !sameCoord(originCoord, destCoord)) {
         transportationRoutes.push({
           coords: [originCoord, destCoord],
-          color: '#14b8a6',
+          color: '#1e3a8a',
           type: 'ferry'
         });
       }

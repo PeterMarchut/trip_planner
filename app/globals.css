@@ -895,7 +895,7 @@ input {
 /* --- Category color coding for itinerary rows --- */
 :root {
   --cat-flights:        #38bdf8;  /* sky */
-  --cat-ferries:        #14b8a6;  /* teal */
+  --cat-ferries:        #1e3a8a;  /* navy */
   --cat-carRentals:     #f97316;  /* orange */
   --cat-accommodations: #a855f7;  /* violet */
   --cat-dinners:        #f43f5e;  /* rose */
