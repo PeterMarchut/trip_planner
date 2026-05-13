@@ -4,7 +4,7 @@ import { useTripData } from '../components/useTripData';
 import { useOwnerToken } from '../lib/auth';
 import { collectByCategory, formatDate } from '../lib/trip-utils';
 
-const CATEGORY_LABEL = { dinners: 'Dinner', excursions: 'Excursion' };
+const CATEGORY_LABEL = { dinners: 'Dining', excursions: 'Excursion' };
 
 export default function EventsPage() {
   const { days, status } = useTripData();

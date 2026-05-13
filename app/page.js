@@ -45,7 +45,7 @@ const ITEM_TYPES = {
     fields: ['name', 'time'],
     detailFields: ['address', 'phone', 'bookingVendor', 'confirmationNumber', 'notes'],
     timeField: 'time',
-    label: 'Dinner'
+    label: 'Dining'
   },
   excursions: {
     fields: ['name', 'time'],

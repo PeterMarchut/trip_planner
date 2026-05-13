@@ -3,7 +3,7 @@ export const itemTypes = {
   ferries: { label: 'Ferry', timeField: 'departure', icon: '⛴' },
   carRentals: { label: 'Car Rental', timeField: 'pickup', icon: '🚗' },
   accommodations: { label: 'Stay', timeField: 'checkIn', icon: '🏨' },
-  dinners: { label: 'Dinner', timeField: 'time', icon: '🍽' },
+  dinners: { label: 'Dining', timeField: 'time', icon: '🍽' },
   excursions: { label: 'Excursion', timeField: 'time', icon: '🎯' }
 };
 
