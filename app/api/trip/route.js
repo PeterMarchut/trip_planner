@@ -18,6 +18,8 @@ const PRIVATE_FIELDS = [
   'arrivalAddress'
 ];
 
+const SANDBOX = !process.env.REDIS_URL;
+
 let _client;
 function client() {
   if (!_client) {
@@ -66,6 +68,9 @@ function sanitize(data) {
 }
 
 export async function GET(request) {
+  // Sandbox mode: no Redis configured. Return empty so the client falls back
+  // to the seeded sample + localStorage. Each visitor gets their own copy.
+  if (SANDBOX) return Response.json({ days: null, ideas: null });
   try {
     const raw = await client().get(KEY);
     if (raw == null) return Response.json({ days: null, ideas: null });
@@ -81,6 +86,8 @@ export async function GET(request) {
 }
 
 export async function PUT(request) {
+  // Sandbox mode: silently accept; client persists to localStorage only.
+  if (SANDBOX) return Response.json({ ok: true });
   if (!isOwner(request)) {
     return Response.json({ error: 'Forbidden' }, { status: 403 });
   }
@@ -97,6 +104,7 @@ export async function PUT(request) {
 }
 
 export async function DELETE(request) {
+  if (SANDBOX) return Response.json({ ok: true });
   if (!isOwner(request)) {
     return Response.json({ error: 'Forbidden' }, { status: 403 });
   }

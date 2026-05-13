@@ -16,14 +16,22 @@ export function setOwnerToken(token) {
   } catch {}
 }
 
-// Hook that exposes the current token and a setter. The token is read on mount
-// so SSR doesn't mismatch.
+// Hook that exposes the current token + whether the server requires auth.
+// On a sandbox deployment (no OWNER_TOKEN set on the server), auth-check
+// reports configured: false and we treat every visitor as owner so the edit
+// UI is fully usable. On a personal/production deployment, owner mode
+// requires a matching local token.
 export function useOwnerToken() {
   const [token, setTokenState] = useState(null);
   const [hydrated, setHydrated] = useState(false);
+  const [serverRequiresAuth, setServerRequiresAuth] = useState(true);
 
   useEffect(() => {
     setTokenState(getOwnerToken());
+    fetch('/api/auth/check')
+      .then(r => r.json())
+      .then(data => setServerRequiresAuth(data?.configured !== false))
+      .catch(() => {});
     setHydrated(true);
   }, []);
 
@@ -32,7 +40,11 @@ export function useOwnerToken() {
     setTokenState(next || null);
   };
 
-  return { token, isOwner: !!token, hydrated, setToken: set };
+  // Anyone on a sandbox (server says no auth required) is an owner.
+  // Otherwise, owner-mode requires a local token.
+  const isOwner = !serverRequiresAuth || !!token;
+
+  return { token, isOwner, hydrated, setToken: set, serverRequiresAuth };
 }
 
 // fetch wrapper that adds the Authorization header when a token is set.

@@ -1,5 +1,10 @@
+import { checkAndIncrementDailyCap, cacheGet, cacheSet } from '../../../lib/quota';
+
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+
+const PLACES_DAILY_LIMIT = 200;
+const PLACES_CACHE = 'places';
 
 // Cities the planner already knows about. Used to snap a parsed coord to the
 // nearest trip location so the resulting idea filters correctly.
@@ -101,6 +106,17 @@ export async function GET(request) {
   const inputUrl = searchParams.get('url');
   if (!inputUrl) return Response.json({ error: 'url required' }, { status: 400 });
 
+  const cached = cacheGet(PLACES_CACHE, inputUrl);
+  if (cached) return Response.json(cached);
+
+  const cap = checkAndIncrementDailyCap('places', PLACES_DAILY_LIMIT);
+  if (!cap.ok) {
+    return Response.json(
+      { error: `Daily place-lookup limit reached on this demo instance. Try again in ${Math.ceil(cap.retryAfter / 3600)}h.` },
+      { status: 429, headers: { 'Retry-After': String(cap.retryAfter) } }
+    );
+  }
+
   // Follow redirects to expand maps.app.goo.gl short URLs to the long /place/... form.
   let resolved = inputUrl;
   try {
@@ -129,11 +145,13 @@ export async function GET(request) {
     phone = extractPhone(reverse);
   }
 
-  return Response.json({
+  const result = {
     name: parsed.name || '',
     coord: parsed.coord || null,
     location,
     address,
     phone
-  });
+  };
+  cacheSet(PLACES_CACHE, inputUrl, result);
+  return Response.json(result);
 }

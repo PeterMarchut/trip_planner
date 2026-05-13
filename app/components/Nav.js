@@ -13,7 +13,7 @@ const links = [
 
 export default function Nav() {
   const pathname = usePathname();
-  const { isOwner, hydrated, setToken } = useOwnerToken();
+  const { isOwner, hydrated, setToken, serverRequiresAuth } = useOwnerToken();
 
   const handleSignIn = () => {
     if (typeof window === 'undefined') return;
@@ -45,7 +45,10 @@ export default function Nav() {
           );
         })}
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          {hydrated && (
+          {hydrated && !serverRequiresAuth && (
+            <span style={{ fontSize: '0.78em', opacity: 0.7 }}>🧪 Sandbox</span>
+          )}
+          {hydrated && serverRequiresAuth && (
             isOwner ? (
               <>
                 <span style={{ fontSize: '0.78em', opacity: 0.7 }}>🔓 Owner</span>
